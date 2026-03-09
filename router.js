@@ -3,6 +3,7 @@ import parseQuery from './helpers/parseQuery.js';
 import validateStudent from './helpers/validateStudent.js';
 import idFromPath from './helpers/idFromPath.js';
 import send from './helpers/send.js';
+import logRequest from './helpers/logRequest.js';
 
 let students = [
   { id: 1, name: 'Ivan', grades: [5, 4, 5], course: 2 },
@@ -16,6 +17,20 @@ let nextId = 4;
 const router = async (req, res) => {
   const { method, url } = req;
   const basePath = url.split('?')[0];
+
+
+  // GET /health
+  if (req.method === 'GET' && basePath === '/health') {
+    const data = {
+      pid: process.pid,
+      nodeVersion: process.version,
+      platform: process.platform,
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+    };
+    return send(res, 200, data);
+  }
+
 
   // GET /students  — list, optional ?course=N
   if (method === 'GET' && basePath === '/students') {
