@@ -1,11 +1,15 @@
-import {createServer} from 'http';
+import { createServer } from 'http';
+import config from './config.js';
 import send from './helpers/send.js';
 import router from './router.js';
+import logRequest from './helpers/logRequest.js';
+import gracefulShutdown from './helpers/gracefulShutdown.js';
 
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || 'localhost';
+// ─── HTTP server ─────────────────────────────────────────────────────────────
 
 const server = createServer(async (req, res) => {
+  res.on('finish', () => logRequest(req, res.statusCode));
+
   try {
     await router(req, res);
   } catch (err) {
@@ -13,13 +17,23 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`Student Database API running at http://${HOST}:${PORT}`);
-  console.log('');
-  console.log('Endpoints:');
-  console.log('  GET    /students          — list all students');
-  console.log('  GET    /students?course=2 — filter by course');
-  console.log('  POST   /students          — add a new student');
-  console.log('  PATCH  /students/:id      — partial update');
-  console.log('  DELETE /students/:id      — expel student');
+server.listen(config.PORT, config.HOSTNAME, () => {
+  process.stdout.write(`Student Database API running at http://${config.HOSTNAME}:${config.PORT}\n`);
+});
+
+// ─── OS signals ──────────────────────────────────────────────────────────────
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT', server));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM', server));
+
+// ─── Global error handlers ───────────────────────────────────────────────────
+
+process.on('uncaughtException', (err) => {
+  process.stderr.write(`[UNCAUGHT EXCEPTION] ${err.message}\n${err.stack}\n`);
+  gracefulShutdown('uncaughtException', server);
+});
+
+process.on('unhandledRejection', (reason) => {
+  process.stderr.write(`[UNHANDLED REJECTION] ${reason}\n`);
+  gracefulShutdown('unhandledRejection', server);
 });
