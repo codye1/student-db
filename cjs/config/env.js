@@ -2,6 +2,13 @@
 
 const Ajv = require('ajv');
 
+try {
+  process.loadEnvFile('.env');
+} catch {
+  process.stderr.write('[CONFIG] No .env file found, using environment variables.\n');
+  process.exit(1);
+}
+
 const envSchema = {
   type: 'object',
   properties: {

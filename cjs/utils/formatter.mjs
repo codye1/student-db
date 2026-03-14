@@ -1,5 +1,9 @@
 await new Promise(resolve => setTimeout(resolve, 0));
 
-export const formatName = (name) => {
+const formatName = (name) => {
   return name.trim().toUpperCase();
+};
+
+export default {
+  formatName
 };
