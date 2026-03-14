@@ -13,4 +13,4 @@ const formatAjvErrors = (errors = []) => {
   });
 };
 
-export default formatAjvErrors;
+module.exports = formatAjvErrors;

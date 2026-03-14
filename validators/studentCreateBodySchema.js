@@ -25,4 +25,4 @@ const studentCreateBodySchema = {
   },
 };
 
-export default studentCreateBodySchema;
+module.exports = studentCreateBodySchema;

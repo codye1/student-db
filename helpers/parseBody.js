@@ -14,4 +14,4 @@ const parseBody = (req) => {
   });
 };
 
-export default parseBody;
+module.exports = parseBody;

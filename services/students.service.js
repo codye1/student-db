@@ -6,7 +6,7 @@ let students = [
 
 let nextId = 4;
 
-export const listStudents = (course) => {
+const listStudents = (course) => {
   if (course !== undefined) {
     return students.filter((student) => student.course === course);
   }
@@ -14,7 +14,7 @@ export const listStudents = (course) => {
   return students;
 };
 
-export const addStudent = ({ name, grades, course }) => {
+const addStudent = ({ name, grades, course }) => {
   const student = {
     id: nextId++,
     name,
@@ -26,7 +26,7 @@ export const addStudent = ({ name, grades, course }) => {
   return student;
 };
 
-export const updateStudentById = (id, patch) => {
+const updateStudentById = (id, patch) => {
   const index = students.findIndex((student) => student.id === id);
   if (index === -1) {
     return null;
@@ -37,7 +37,7 @@ export const updateStudentById = (id, patch) => {
   return updated;
 };
 
-export const deleteStudentById = (id) => {
+const deleteStudentById = (id) => {
   const index = students.findIndex((student) => student.id === id);
   if (index === -1) {
     return null;
@@ -45,4 +45,11 @@ export const deleteStudentById = (id) => {
 
   const [removed] = students.splice(index, 1);
   return removed;
+};
+
+module.exports = {
+  listStudents,
+  addStudent,
+  updateStudentById,
+  deleteStudentById,
 };

@@ -21,4 +21,4 @@ const gracefulShutdown = (signal, server) => {
   });
 };
 
-export default gracefulShutdown;
+module.exports = gracefulShutdown;

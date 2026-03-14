@@ -1,9 +1,9 @@
-import { createServer } from 'http';
-import config from './config.js';
-import send from '#helpers/send';
-import router from './router.js';
-import logRequest from '#helpers/logRequest';
-import gracefulShutdown from '#helpers/gracefulShutdown';
+const { createServer } = require('http');
+const config = require('./config');
+const send = require('./helpers/send');
+const router = require('./router');
+const logRequest = require('./helpers/logRequest');
+const gracefulShutdown = require('./helpers/gracefulShutdown');
 
 // ─── HTTP server ─────────────────────────────────────────────────────────────
 

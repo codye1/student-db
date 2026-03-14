@@ -1,25 +1,25 @@
-import parseBody from '#helpers/parseBody';
-import parseQuery from '#helpers/parseQuery';
-import send from '#helpers/send';
-import {
+const parseBody = require('../helpers/parseBody');
+const parseQuery = require('../helpers/parseQuery');
+const send = require('../helpers/send');
+const {
   listStudents,
   addStudent,
   updateStudentById,
   deleteStudentById,
-} from '#services/students.service';
-import ajv from '#validators/ajv';
-import formatAjvErrors from '#validators/formatAjvErrors';
-import studentsQuerySchema from '#validators/studentsQuerySchema';
-import studentParamsSchema from '#validators/studentParamsSchema';
-import studentCreateBodySchema from '#validators/studentCreateBodySchema';
-import studentPatchBodySchema from '#validators/studentPatchBodySchema';
+} = require('../services/students.service');
+const ajv = require('../validators/ajv');
+const formatAjvErrors = require('../validators/formatAjvErrors');
+const studentsQuerySchema = require('../validators/studentsQuerySchema');
+const studentParamsSchema = require('../validators/studentParamsSchema');
+const studentCreateBodySchema = require('../validators/studentCreateBodySchema');
+const studentPatchBodySchema = require('../validators/studentPatchBodySchema');
 
 const validateStudentsQuery = ajv.compile(studentsQuerySchema);
 const validateStudentParams = ajv.compile(studentParamsSchema);
 const validateStudentCreateBody = ajv.compile(studentCreateBodySchema);
 const validateStudentPatchBody = ajv.compile(studentPatchBodySchema);
 
-export const getStudents = async (req, res) => {
+const getStudents = async (req, res) => {
   const query = parseQuery(req.url);
 
   if (!validateStudentsQuery(query)) {
@@ -32,7 +32,7 @@ export const getStudents = async (req, res) => {
   return send(res, 200, listStudents(course));
 };
 
-export const createStudent = async (req, res) => {
+const createStudent = async (req, res) => {
   let body;
   try {
     body = await parseBody(req);
@@ -54,7 +54,7 @@ export const createStudent = async (req, res) => {
   return send(res, 201, student);
 };
 
-export const patchStudent = async (req, res, id) => {
+const patchStudent = async (req, res, id) => {
   const params = { id };
   if (!validateStudentParams(params)) {
     return send(res, 400, {
@@ -86,7 +86,7 @@ export const patchStudent = async (req, res, id) => {
   return send(res, 200, updated);
 };
 
-export const deleteStudent = async (req, res, id) => {
+const deleteStudent = async (req, res, id) => {
   const params = { id };
   if (!validateStudentParams(params)) {
     return send(res, 400, {
@@ -102,4 +102,11 @@ export const deleteStudent = async (req, res, id) => {
     message: `Student "${removed.name}" has been expelled`,
     student: removed,
   });
+};
+
+module.exports = {
+  getStudents,
+  createStudent,
+  patchStudent,
+  deleteStudent,
 };

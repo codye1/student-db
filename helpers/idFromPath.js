@@ -3,4 +3,4 @@ const idFromPath = (url) => {
   return match ? match[1] : null;
 };
 
-export default idFromPath;
+module.exports = idFromPath;

@@ -4,4 +4,4 @@ const parseQuery = (url) => {
   return Object.fromEntries(new URLSearchParams(url.slice(idx + 1)));
 };
 
-export default parseQuery;
+module.exports = parseQuery;

@@ -1,6 +1,6 @@
-import ajv from '#validators/ajv';
-import configSchema from '#validators/configSchema';
-import formatAjvErrors from '#validators/formatAjvErrors';
+const ajv = require('./validators/ajv');
+const configSchema = require('./validators/configSchema');
+const formatAjvErrors = require('./validators/formatAjvErrors');
 
 const validateConfig = ajv.compile(configSchema);
 
@@ -25,7 +25,7 @@ if (!validateConfig(runtimeConfig)) {
   process.exit(1);
 }
 
-export default {
+module.exports = {
   PORT: runtimeConfig.PORT,
   HOSTNAME: runtimeConfig.HOSTNAME,
   NODE_ENV: runtimeConfig.NODE_ENV,

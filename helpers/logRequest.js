@@ -1,4 +1,4 @@
-import config from '../config.js';
+const config = require('../config');
 
 const logRequest = (req, statusCode) => {
   const level = statusCode >= 500 ? '[ERROR]' : '[INFO]';
@@ -16,4 +16,4 @@ const logRequest = (req, statusCode) => {
   }
 };
 
-export default logRequest;
+module.exports = logRequest;

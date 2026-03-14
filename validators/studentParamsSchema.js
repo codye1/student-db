@@ -10,4 +10,4 @@ const studentParamsSchema = {
   },
 };
 
-export default studentParamsSchema;
+module.exports = studentParamsSchema;

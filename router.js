@@ -1,11 +1,11 @@
-import send from '#helpers/send';
-import idFromPath from '#helpers/idFromPath';
-import {
+const send = require('./helpers/send');
+const idFromPath = require('./helpers/idFromPath');
+const {
   getStudents,
   createStudent,
   patchStudent,
   deleteStudent,
-} from '#controllers/students.controller';
+} = require('./controllers/students.controller');
 
 const router = async (req, res) => {
   const { method, url } = req;
@@ -45,4 +45,4 @@ const router = async (req, res) => {
   send(res, 404, { error: 'Route not found' });
 };
 
-export default router;
+module.exports = router;

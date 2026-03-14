@@ -25,4 +25,4 @@ const studentPatchBodySchema = {
   },
 };
 
-export default studentPatchBodySchema;
+module.exports = studentPatchBodySchema;

@@ -9,4 +9,4 @@ const studentsQuerySchema = {
   },
 };
 
-export default studentsQuerySchema;
+module.exports = studentsQuerySchema;

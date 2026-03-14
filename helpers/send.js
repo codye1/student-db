@@ -7,4 +7,4 @@ const send = (res, statusCode, data) => {
   res.end(body);
 };
 
-export default send;
+module.exports = send;
