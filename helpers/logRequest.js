@@ -14,6 +14,6 @@ const logRequest = (req, statusCode) => {
   if (statusCode >= 400) {
     process.stderr.write(line + '\n');
   }
-}
+};
 
 export default logRequest;

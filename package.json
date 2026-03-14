@@ -1,14 +1,46 @@
 {
   "name": "student-db",
   "version": "1.0.0",
-  "description": "",
+  "description": "db for students",
+  "keywords": [],
+  "homepage": "https://github.com/codye1/student-db#readme",
+  "bugs": {
+    "url": "https://github.com/codye1/student-db/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codye1/student-db.git"
+  },
+  "license": "ISC",
+  "author": "Mykhailo Lyzanets",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node app.js",
+    "predev": "npm run check",
+    "dev": "node --watch app.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run format:check",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module"
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1"
+  },
+  "dependencies": {
+    "ajv": "^8.18.0"
+  },
+  "imports": {
+    "#controllers/*": "./controllers/*.js",
+    "#services/*": "./services/*.js",
+    "#helpers/*": "./helpers/*.js",
+    "#validators/*": "./validators/*.js"
+  }
 }
