@@ -1,9 +1,9 @@
 import { createServer } from 'http';
 import config from './config.js';
-import send from './helpers/send.js';
+import send from '#helpers/send';
 import router from './router.js';
-import logRequest from './helpers/logRequest.js';
-import gracefulShutdown from './helpers/gracefulShutdown.js';
+import logRequest from '#helpers/logRequest';
+import gracefulShutdown from '#helpers/gracefulShutdown';
 
 // ─── HTTP server ─────────────────────────────────────────────────────────────
 
@@ -18,7 +18,9 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(config.PORT, config.HOSTNAME, () => {
-  process.stdout.write(`Student Database API running at http://${config.HOSTNAME}:${config.PORT}\n`);
+  process.stdout.write(
+    `Student Database API running at http://${config.HOSTNAME}:${config.PORT}\n`
+  );
 });
 
 // ─── OS signals ──────────────────────────────────────────────────────────────
