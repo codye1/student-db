@@ -1,18 +1,18 @@
-const parseBody = require('../helpers/parseBody');
-const parseQuery = require('../helpers/parseQuery');
-const send = require('../helpers/send');
+const parseBody = require('#helpers/parseBody');
+const parseQuery = require('#helpers/parseQuery');
+const send = require('#helpers/send');
 const {
   listStudents,
   addStudent,
   updateStudentById,
   deleteStudentById,
-} = require('../services/students.service');
-const ajv = require('../validators/ajv');
-const formatAjvErrors = require('../validators/formatAjvErrors');
-const studentsQuerySchema = require('../validators/studentsQuerySchema');
-const studentParamsSchema = require('../validators/studentParamsSchema');
-const studentCreateBodySchema = require('../validators/studentCreateBodySchema');
-const studentPatchBodySchema = require('../validators/studentPatchBodySchema');
+} = require('#services/students.service');
+const ajv = require('#validators/ajv');
+const formatAjvErrors = require('#validators/formatAjvErrors');
+const studentsQuerySchema = require('#validators/studentsQuerySchema');
+const studentParamsSchema = require('#validators/studentParamsSchema');
+const studentCreateBodySchema = require('#validators/studentCreateBodySchema');
+const studentPatchBodySchema = require('#validators/studentPatchBodySchema');
 
 const validateStudentsQuery = ajv.compile(studentsQuerySchema);
 const validateStudentParams = ajv.compile(studentParamsSchema);

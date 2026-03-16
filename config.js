@@ -1,6 +1,6 @@
-const ajv = require('./validators/ajv');
-const configSchema = require('./validators/configSchema');
-const formatAjvErrors = require('./validators/formatAjvErrors');
+const ajv = require('#validators/ajv');
+const configSchema = require('#validators/configSchema');
+const formatAjvErrors = require('#validators/formatAjvErrors');
 
 const validateConfig = ajv.compile(configSchema);
 

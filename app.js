@@ -1,9 +1,9 @@
 const { createServer } = require('http');
 const config = require('./config');
-const send = require('./helpers/send');
+const send = require('#helpers/send');
 const router = require('./router');
-const logRequest = require('./helpers/logRequest');
-const gracefulShutdown = require('./helpers/gracefulShutdown');
+const logRequest = require('#helpers/logRequest');
+const gracefulShutdown = require('#helpers/gracefulShutdown');
 
 // ─── HTTP server ─────────────────────────────────────────────────────────────
 

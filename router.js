@@ -1,5 +1,5 @@
-const send = require('./helpers/send');
-const idFromPath = require('./helpers/idFromPath');
+const send = require('#helpers/send');
+const idFromPath = require('#helpers/idFromPath');
 const {
   getStudents,
   createStudent,
