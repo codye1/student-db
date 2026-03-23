@@ -1,48 +1,29 @@
-import send from '#helpers/send';
-import idFromPath from '#helpers/idFromPath';
-import {
-  getStudents,
-  createStudent,
-  patchStudent,
-  deleteStudent,
-} from '#controllers/students.controller';
+import { studentRoutes } from '#controllers/students.controller';
 
-const router = async (req, res) => {
-  const { method, url } = req;
-  const basePath = url.split('?')[0];
+export default async function router(fastify) {
+  fastify.get('/health', async () => ({ status: 'ok' }));
 
-  // GET /health
-  if (req.method === 'GET' && basePath === '/health') {
-    const data = {
+  fastify.route({
+    method: 'GET',
+    url: '/health/details',
+    onRequest: (request, reply, done) => {
+      const apiKey = request.headers['x-api-key'];
+      if (!apiKey || apiKey !== fastify.config.ADMIN_API_KEY) {
+        return reply.unauthorized('Invalid or missing API key');
+      }
+      done();
+    },
+    handler: async () => ({
       pid: process.pid,
       nodeVersion: process.version,
       platform: process.platform,
       uptime: process.uptime(),
       memoryUsage: process.memoryUsage(),
-    };
-    return send(res, 200, data);
+    }),
+  });
+
+  // Students routes
+  for (const route of studentRoutes) {
+    fastify.route(route);
   }
-
-  if (method === 'GET' && basePath === '/students') {
-    return getStudents(req, res);
-  }
-
-  if (method === 'POST' && basePath === '/students') {
-    return createStudent(req, res);
-  }
-
-  const studentId = idFromPath(basePath);
-
-  if (method === 'PATCH' && studentId !== null) {
-    return patchStudent(req, res, studentId);
-  }
-
-  if (method === 'DELETE' && studentId !== null) {
-    return deleteStudent(req, res, studentId);
-  }
-
-  // 404 fallback
-  send(res, 404, { error: 'Route not found' });
-};
-
-export default router;
+}

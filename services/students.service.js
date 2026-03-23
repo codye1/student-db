@@ -27,7 +27,9 @@ export const addStudent = ({ name, grades, course }) => {
 };
 
 export const updateStudentById = (id, patch) => {
-  const index = students.findIndex((student) => student.id === id);
+  console.log(id);
+
+  const index = students.findIndex((student) => student.id === Number(id));
   if (index === -1) {
     return null;
   }
@@ -38,7 +40,7 @@ export const updateStudentById = (id, patch) => {
 };
 
 export const deleteStudentById = (id) => {
-  const index = students.findIndex((student) => student.id === id);
+  const index = students.findIndex((student) => student.id === Number(id));
   if (index === -1) {
     return null;
   }

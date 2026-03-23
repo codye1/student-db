@@ -1,41 +1,107 @@
-import { createServer } from 'http';
-import config from './config.js';
-import send from '#helpers/send';
-import router from './router.js';
-import logRequest from '#helpers/logRequest';
+import Fastify from 'fastify';
+import fastifyEnv from '@fastify/env';
 import gracefulShutdown from '#helpers/gracefulShutdown';
+import router from './router.js';
+import fastifySensible from '@fastify/sensible';
+import fastifyCors from '@fastify/cors';
+import fastifyHelmet from '@fastify/helmet';
 
-// ─── HTTP server ─────────────────────────────────────────────────────────────
+// ─── Fastify server ──────────────────────────────────────────────────────────
 
-const server = createServer(async (req, res) => {
-  res.on('finish', () => logRequest(req, res.statusCode));
+const envSchema = {
+  type: 'object',
+  required: ['PORT', 'HOSTNAME', 'NODE_ENV', 'ADMIN_API_KEY'],
+  properties: {
+    PORT: { type: 'string', default: '3000' },
+    HOSTNAME: { type: 'string', default: '127.0.0.1' },
+    NODE_ENV: { type: 'string', default: 'development' },
+    ADMIN_API_KEY: { type: 'string' },
+  },
+};
 
-  try {
-    await router(req, res);
-  } catch (err) {
-    send(res, 500, { error: 'Internal server error', details: err.message });
+const options = {
+  schema: envSchema,
+  dotenv: true,
+};
+
+let fastify;
+
+(async () => {
+  const tempFastify = Fastify();
+  await tempFastify.register(fastifyEnv, options);
+  const env = tempFastify.config;
+
+  let logger;
+  if (env.NODE_ENV === 'development') {
+    logger = {
+      level: 'info',
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:standard',
+          ignore: 'pid,hostname',
+        },
+      },
+    };
+  } else {
+    logger = {
+      level: 'error',
+    };
   }
-});
 
-server.listen(config.PORT, config.HOSTNAME, () => {
-  process.stdout.write(
-    `Student Database API running at http://${config.HOSTNAME}:${config.PORT}\n`
+  fastify = Fastify({ logger });
+  await fastify.register(fastifyEnv, options);
+  await fastify.register(fastifySensible);
+  await fastify.register(fastifyHelmet, { global: true });
+  const isDev = fastify.config.NODE_ENV === 'development';
+  await fastify.register(fastifyCors, {
+    origin: isDev ? '*' : 'https://your-production-domain.com',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  });
+
+  fastify.addHook('onClose', async (instance, done) => {
+    process.stdout.write('[FASTIFY] Server is closing...\n');
+    done();
+  });
+
+  fastify.setErrorHandler((error, request, reply) => {
+    fastify.log.error(error);
+    reply
+      .status(500)
+      .send({ error: 'Internal server error', details: error.message });
+  });
+
+  await fastify.register(router);
+
+  fastify.listen(
+    { port: Number(fastify.config.PORT), host: fastify.config.HOSTNAME },
+    (err, address) => {
+      if (err) {
+        process.stderr.write(`[FASTIFY ERROR] ${err.message}\n`);
+        process.exit(1);
+      }
+      process.stdout.write(`Student Database API running at ${address}\n`);
+    }
   );
+})().catch((err) => {
+  process.stderr.write(`[FASTIFY ENV ERROR] ${err.message}\n`);
+  process.exit(1);
 });
 
 // ─── OS signals ──────────────────────────────────────────────────────────────
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT', server));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM', server));
+process.on('SIGINT', () => gracefulShutdown('SIGINT', fastify.server));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM', fastify.server));
 
 // ─── Global error handlers ───────────────────────────────────────────────────
 
 process.on('uncaughtException', (err) => {
   process.stderr.write(`[UNCAUGHT EXCEPTION] ${err.message}\n${err.stack}\n`);
-  gracefulShutdown('uncaughtException', server);
+  gracefulShutdown('uncaughtException', fastify.server);
 });
 
 process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[UNHANDLED REJECTION] ${reason}\n`);
-  gracefulShutdown('unhandledRejection', server);
+  gracefulShutdown('unhandledRejection', fastify.server);
 });

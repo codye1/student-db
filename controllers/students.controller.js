@@ -1,105 +1,111 @@
-import parseBody from '#helpers/parseBody';
-import parseQuery from '#helpers/parseQuery';
-import send from '#helpers/send';
 import {
   listStudents,
   addStudent,
   updateStudentById,
   deleteStudentById,
 } from '#services/students.service';
-import ajv from '#validators/ajv';
-import formatAjvErrors from '#validators/formatAjvErrors';
-import studentsQuerySchema from '#validators/studentsQuerySchema';
-import studentParamsSchema from '#validators/studentParamsSchema';
-import studentCreateBodySchema from '#validators/studentCreateBodySchema';
-import studentPatchBodySchema from '#validators/studentPatchBodySchema';
+import studentsQuerySchema from '../schemas/studentsQuerySchema.js';
+import studentParamsSchema from '../schemas/studentParamsSchema.js';
+import studentCreateBodySchema from '../schemas/studentCreateBodySchema.js';
+import studentPatchBodySchema from '../schemas/studentPatchBodySchema.js';
+import { STUDENT_NOT_FOUND } from '../constants/errors.js';
 
-const validateStudentsQuery = ajv.compile(studentsQuerySchema);
-const validateStudentParams = ajv.compile(studentParamsSchema);
-const validateStudentCreateBody = ajv.compile(studentCreateBodySchema);
-const validateStudentPatchBody = ajv.compile(studentPatchBodySchema);
-
-export const getStudents = async (req, res) => {
-  const query = parseQuery(req.url);
-
-  if (!validateStudentsQuery(query)) {
-    return send(res, 400, {
-      errors: formatAjvErrors(validateStudentsQuery.errors),
-    });
-  }
-
-  const { course } = query;
-  return send(res, 200, listStudents(course));
+// Схемы для ответов
+const studentResponseSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'integer' },
+    name: { type: 'string' },
+    grades: { type: 'array', items: { type: 'integer' } },
+    course: { type: 'integer' },
+  },
 };
 
-export const createStudent = async (req, res) => {
-  let body;
-  try {
-    body = await parseBody(req);
-  } catch {
-    return send(res, 400, { error: 'Invalid JSON body' });
-  }
-
-  if (!validateStudentCreateBody(body)) {
-    return send(res, 400, {
-      errors: formatAjvErrors(validateStudentCreateBody.errors),
-    });
-  }
-
-  const student = addStudent({
-    name: body.name.trim(),
-    grades: body.grades,
-    course: body.course,
-  });
-  return send(res, 201, student);
+const studentsListResponseSchema = {
+  type: 'array',
+  items: studentResponseSchema,
 };
 
-export const patchStudent = async (req, res, id) => {
-  const params = { id };
-  if (!validateStudentParams(params)) {
-    return send(res, 400, {
-      errors: formatAjvErrors(validateStudentParams.errors),
-    });
-  }
-
-  let body;
-  try {
-    body = await parseBody(req);
-  } catch {
-    return send(res, 400, { error: 'Invalid JSON body' });
-  }
-
-  if (!validateStudentPatchBody(body)) {
-    return send(res, 400, {
-      errors: formatAjvErrors(validateStudentPatchBody.errors),
-    });
-  }
-
-  const patch = {};
-  if (body.name !== undefined) patch.name = body.name.trim();
-  if (body.grades !== undefined) patch.grades = body.grades;
-  if (body.course !== undefined) patch.course = body.course;
-
-  const updated = updateStudentById(id, patch);
-  if (!updated)
-    return send(res, 404, { error: `Student with id=${id} not found` });
-  return send(res, 200, updated);
+const expelledResponseSchema = {
+  type: 'object',
+  properties: {
+    message: { type: 'string' },
+    student: studentResponseSchema,
+  },
 };
 
-export const deleteStudent = async (req, res, id) => {
-  const params = { id };
-  if (!validateStudentParams(params)) {
-    return send(res, 400, {
-      errors: formatAjvErrors(validateStudentParams.errors),
-    });
-  }
-
-  const removed = deleteStudentById(id);
-  if (!removed)
-    return send(res, 404, { error: `Student with id=${id} not found` });
-
-  return send(res, 200, {
-    message: `Student "${removed.name}" has been expelled`,
-    student: removed,
-  });
-};
+export const studentRoutes = [
+  {
+    method: 'GET',
+    url: '/students',
+    schema: {
+      querystring: studentsQuerySchema,
+      response: {
+        200: studentsListResponseSchema,
+      },
+    },
+    handler: (request, reply) => {
+      const { course } = request.query;
+      const students = listStudents(course);
+      reply.code(200).send(students);
+    },
+  },
+  {
+    method: 'POST',
+    url: '/students',
+    schema: {
+      body: studentCreateBodySchema,
+      response: {
+        201: studentResponseSchema,
+      },
+    },
+    handler: (request, reply) => {
+      const { name, grades, course } = request.body;
+      const student = addStudent({ name: name.trim(), grades, course });
+      reply.code(201).send(student);
+    },
+  },
+  {
+    method: 'PATCH',
+    url: '/students/:id',
+    schema: {
+      params: studentParamsSchema,
+      body: studentPatchBodySchema,
+      response: {
+        200: studentResponseSchema,
+        404: { type: 'object', properties: { error: { type: 'string' } } },
+      },
+    },
+    handler: (request, reply) => {
+      const { id } = request.params;
+      const patch = {};
+      if (request.body.name !== undefined)
+        patch.name = request.body.name.trim();
+      if (request.body.grades !== undefined) patch.grades = request.body.grades;
+      if (request.body.course !== undefined) patch.course = request.body.course;
+      const updated = updateStudentById(id, patch);
+      if (!updated) return reply.notFound(STUDENT_NOT_FOUND(id));
+      reply.code(200).send(updated);
+    },
+  },
+  {
+    method: 'DELETE',
+    url: '/students/:id',
+    schema: {
+      params: studentParamsSchema,
+      response: {
+        200: expelledResponseSchema,
+        404: { type: 'object', properties: { error: { type: 'string' } } },
+      },
+    },
+    handler: (request, reply) => {
+      const { id } = request.params;
+      const removed = deleteStudentById(id);
+      if (!removed) return reply.notFound(STUDENT_NOT_FOUND(id));
+      reply.code(200).send({
+        message: `Student "${removed.name}" has been expelled`,
+        student: removed,
+      });
+    },
+  },
+];

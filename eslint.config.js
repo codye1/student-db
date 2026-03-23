@@ -13,5 +13,16 @@ export default defineConfig([
         ...globals.node,
       },
     },
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'Використання process.env заборонено. Використовуйте fastify.config',
+        },
+      ],
+    },
   },
 ]);

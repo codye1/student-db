@@ -1,6 +1,6 @@
-const gracefulShutdown = (signal, server) => {
+const gracefulShutdown = (signal, fastifyServer) => {
   process.stdout.write(
-    `\n[SHUTDOWN] Received ${signal}. Closing HTTP server...\n`
+    `\n[SHUTDOWN] Received ${signal}. Closing Fastify server...\n`
   );
 
   const forceExit = setTimeout(() => {
@@ -8,17 +8,21 @@ const gracefulShutdown = (signal, server) => {
     process.exit(1);
   }, 10_000);
 
-  server.close((err) => {
-    clearTimeout(forceExit);
-    if (err) {
+  // Fastify server.close() возвращает Promise
+  fastifyServer
+    .close()
+    .then(() => {
+      clearTimeout(forceExit);
+      process.stdout.write('[SHUTDOWN] Server closed gracefully.\n');
+      process.exit(0);
+    })
+    .catch((err) => {
+      clearTimeout(forceExit);
       process.stderr.write(
         `[SHUTDOWN] Error while closing server: ${err.message}\n`
       );
       process.exit(1);
-    }
-    process.stdout.write('[SHUTDOWN] Server closed gracefully.\n');
-    process.exit(0);
-  });
+    });
 };
 
 export default gracefulShutdown;
