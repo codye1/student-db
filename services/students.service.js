@@ -1,50 +1,32 @@
-let students = [
-  { id: 1, name: 'Ivan', grades: [5, 4, 5], course: 2 },
-  { id: 2, name: 'Olena', grades: [4, 4, 3], course: 1 },
-  { id: 3, name: 'Mykola', grades: [5, 5, 5], course: 3 },
-];
+import {
+  findAll,
+  findById,
+  create,
+  update,
+  remove,
+} from '../src/repositories/items.repository.js';
 
-let nextId = 4;
-
-export const listStudents = (course) => {
+export const listStudents = async (course) => {
+  const students = await findAll();
   if (course !== undefined) {
     return students.filter((student) => student.course === course);
   }
-
   return students;
 };
 
-export const addStudent = ({ name, grades, course }) => {
-  const student = {
-    id: nextId++,
-    name,
-    grades,
-    course,
-  };
+export const addStudent = async (data) => {
+  return await create(data);
+};
 
-  students.push(student);
+export const updateStudentById = async (id, patch) => {
+  const student = await findById(id);
+  if (!student) return null;
+  return await update(id, patch);
+};
+
+export const deleteStudentById = async (id) => {
+  const student = await findById(id);
+  if (!student) return null;
+  await remove(id);
   return student;
-};
-
-export const updateStudentById = (id, patch) => {
-  console.log(id);
-
-  const index = students.findIndex((student) => student.id === Number(id));
-  if (index === -1) {
-    return null;
-  }
-
-  const updated = { ...students[index], ...patch };
-  students[index] = updated;
-  return updated;
-};
-
-export const deleteStudentById = (id) => {
-  const index = students.findIndex((student) => student.id === Number(id));
-  if (index === -1) {
-    return null;
-  }
-
-  const [removed] = students.splice(index, 1);
-  return removed;
 };

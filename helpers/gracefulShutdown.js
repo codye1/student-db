@@ -8,7 +8,6 @@ const gracefulShutdown = (signal, fastifyServer) => {
     process.exit(1);
   }, 10_000);
 
-  // Fastify server.close() возвращает Promise
   fastifyServer
     .close()
     .then(() => {

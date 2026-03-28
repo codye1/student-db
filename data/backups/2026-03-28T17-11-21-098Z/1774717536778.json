@@ -1,0 +1,14 @@
+{
+  "id": "1774717536778",
+  "name": "Іван Петренко",
+  "age": 0,
+  "group": "",
+  "email": "ivan.petrenko@example.com",
+  "grades": [
+    5,
+    4,
+    5
+  ],
+  "course": 2,
+  "image": null
+}

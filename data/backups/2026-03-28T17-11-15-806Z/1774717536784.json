@@ -1,0 +1,14 @@
+{
+  "id": "1774717536784",
+  "name": "Максим Бондар",
+  "age": 0,
+  "group": "",
+  "email": "maks.bondar@example.com",
+  "grades": [
+    5,
+    5,
+    5
+  ],
+  "course": 3,
+  "image": null
+}

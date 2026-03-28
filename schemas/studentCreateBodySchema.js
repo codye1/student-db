@@ -22,5 +22,10 @@ export default {
         maximum: 5,
       },
     },
+    email: {
+      type: ['string', 'null'],
+      format: 'email',
+      nullable: true,
+    },
   },
 };

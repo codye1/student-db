@@ -1,10 +1,15 @@
 import Fastify from 'fastify';
+import { backupData } from './src/helpers/backup.js';
+import { checkMigration } from './src/helpers/migrationCheck.js';
 import fastifyEnv from '@fastify/env';
 import gracefulShutdown from '#helpers/gracefulShutdown';
 import router from './router.js';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
 import fastifySensible from '@fastify/sensible';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
+import fastifyMultipart from '@fastify/multipart';
 
 // ─── Fastify server ──────────────────────────────────────────────────────────
 
@@ -26,7 +31,9 @@ const options = {
 
 let fastify;
 
+// Бекап даних перед запуском сервера
 (async () => {
+  await backupData();
   const tempFastify = Fastify();
   await tempFastify.register(fastifyEnv, options);
   const env = tempFastify.config;
@@ -51,9 +58,11 @@ let fastify;
   }
 
   fastify = Fastify({ logger });
+  await checkMigration(fastify);
   await fastify.register(fastifyEnv, options);
   await fastify.register(fastifySensible);
   await fastify.register(fastifyHelmet, { global: true });
+  await fastify.register(fastifyMultipart);
   const isDev = fastify.config.NODE_ENV === 'development';
   await fastify.register(fastifyCors, {
     origin: isDev ? '*' : 'https://your-production-domain.com',
@@ -72,6 +81,10 @@ let fastify;
       .send({ error: 'Internal server error', details: error.message });
   });
 
+  await fastify.register(fastifyStatic, {
+    root: path.join(process.cwd(), 'uploads'),
+    prefix: '/uploads/',
+  });
   await fastify.register(router);
 
   fastify.listen(
