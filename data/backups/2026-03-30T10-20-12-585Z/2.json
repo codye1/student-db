@@ -6,5 +6,5 @@
   "email": "olena.koval@example.com",
   "grades": [5, 4, 4],
   "course": 2,
-  "image": null
+  "image": "/2/image.png"
 }

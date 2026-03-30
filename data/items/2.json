@@ -4,11 +4,7 @@
   "age": 19,
   "group": "ІП-22",
   "email": "olena.koval@example.com",
-  "grades": [
-    5,
-    4,
-    4
-  ],
+  "grades": [5, 4, 4],
   "course": 2,
   "image": "/2/image.png"
 }

@@ -1,8 +1,8 @@
 {
-  "id": "1774717536778",
+  "id": "1774866128038",
   "name": "Іван Петренко",
-  "age": 0,
-  "group": "",
+  "age": 20,
+  "group": "ІП-21",
   "email": "ivan.petrenko@example.com",
   "grades": [5, 4, 5],
   "course": 2,

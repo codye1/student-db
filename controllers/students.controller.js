@@ -6,15 +6,12 @@ import {
   remove,
 } from '../src/repositories/items.repository.js';
 import { getImageUrl } from '../helpers/imageUrl.js';
-
-// ...existing code...
 import { findAll, create } from '../src/repositories/items.repository.js';
 import { studentsToCsv } from '../helpers/csv.js';
 import { parseImportFile } from '../helpers/csvImport.js';
 import studentCreateBodySchema from '../schemas/studentCreateBodySchema.js';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import fastifyMultipart from '@fastify/multipart';
 import studentsQuerySchema from '../schemas/studentsQuerySchema.js';
 import studentParamsSchema from '../schemas/studentParamsSchema.js';
 import studentPatchBodySchema from '../schemas/studentPatchBodySchema.js';

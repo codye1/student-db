@@ -4,11 +4,7 @@
   "age": 0,
   "group": "",
   "email": "olena.koval@example.com",
-  "grades": [
-    4,
-    4,
-    3
-  ],
+  "grades": [4, 4, 3],
   "course": 1,
   "image": null
 }

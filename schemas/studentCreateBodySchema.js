@@ -8,6 +8,15 @@ export default {
       minLength: 1,
       pattern: '\\S',
     },
+    age: {
+      type: 'integer',
+      minimum: 0,
+      maximum: 150,
+    },
+    group: {
+      type: 'string',
+      minLength: 1,
+    },
     course: {
       type: 'integer',
       minimum: 1,
