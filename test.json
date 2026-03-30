@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Іван Петренко",
+    "email": "ivan.petrenko@example.com",
+    "grades": [5, 4, 5],
+    "course": 2
+  },
+  {
+    "name": "Олена Коваль",
+    "email": "olena.koval@example.com",
+    "grades": [4, 4, 3],
+    "course": 1
+  },
+  {
+    "name": "Максим Бондар",
+    "email": "maks.bondar@example.com",
+    "grades": [5, 5, 5],
+    "course": 3
+  }
+]

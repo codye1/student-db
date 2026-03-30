@@ -1,12 +1,10 @@
-const studentParamsSchema = {
+export default {
   type: 'object',
-  required: ['id'],
   additionalProperties: false,
   properties: {
-    id: {
+    course: {
       type: 'integer',
       minimum: 1,
     },
   },
 };
-export default studentParamsSchema;

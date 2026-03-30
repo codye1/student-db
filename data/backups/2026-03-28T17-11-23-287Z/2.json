@@ -1,0 +1,10 @@
+{
+  "id": "2",
+  "name": "Олена Коваль",
+  "age": 19,
+  "group": "ІП-22",
+  "email": "olena.koval@example.com",
+  "grades": [5, 4, 4],
+  "course": 2,
+  "image": null
+}

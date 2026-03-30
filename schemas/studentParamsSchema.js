@@ -1,4 +1,4 @@
-const studentParamsSchema = {
+export default {
   type: 'object',
   required: ['id'],
   additionalProperties: false,
@@ -9,4 +9,3 @@ const studentParamsSchema = {
     },
   },
 };
-export default studentParamsSchema;
