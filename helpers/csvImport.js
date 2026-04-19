@@ -1,5 +1,3 @@
-// helpers/csvImport.js
-// Імпорт студентів з CSV або JSON
 import { parse as parseCsv } from 'csv-parse/sync';
 
 export function parseImportFile(buffer, filename, mimetype) {

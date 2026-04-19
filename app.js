@@ -10,6 +10,9 @@ import fastifySensible from '@fastify/sensible';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyMultipart from '@fastify/multipart';
+import fastifyRateLimit from '@fastify/rate-limit';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 
 // ─── Fastify server ──────────────────────────────────────────────────────────
 
@@ -21,6 +24,7 @@ const envSchema = {
     HOSTNAME: { type: 'string', default: '127.0.0.1' },
     NODE_ENV: { type: 'string', default: 'development' },
     ADMIN_API_KEY: { type: 'string' },
+    GITHUB_TOKEN: { type: 'string', default: '' },
   },
 };
 
@@ -61,8 +65,32 @@ let fastify;
   await checkMigration(fastify);
   await fastify.register(fastifyEnv, options);
   await fastify.register(fastifySensible);
+  await fastify.register(fastifyRateLimit, {
+    global: true,
+    max: 100,
+    timeWindow: '1 minute',
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'Rate limit exceeded',
+    }),
+  });
+  await fastify.register(fastifySwagger, {
+    openapi: {
+      info: {
+        title: 'Student Database API',
+        description: 'REST API for students service',
+        version: '1.0.0',
+      },
+    },
+  });
+  await fastify.register(fastifySwaggerUi, {
+    routePrefix: '/docs',
+  });
   await fastify.register(fastifyHelmet, { global: true });
-  await fastify.register(fastifyMultipart);
+  await fastify.register(fastifyMultipart, {
+      limits: { fileSize: 5 * 1024 * 1024 },
+  });
   const isDev = fastify.config.NODE_ENV === 'development';
   await fastify.register(fastifyCors, {
     origin: isDev ? '*' : 'https://your-production-domain.com',

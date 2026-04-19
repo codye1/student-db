@@ -7,6 +7,7 @@ const ItemModel = {
   grades: [], // array of numbers (оцінки)
   course: 1, // number (курс)
   image: null, // string (відносний шлях до зображення)
+  test:""
 };
 
 export default ItemModel;
