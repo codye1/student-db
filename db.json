@@ -1,0 +1,14 @@
+{
+  "courses": [
+    {
+      "id": 1,
+      "name": "Computer Science",
+      "credits": 240
+    },
+    {
+      "id": 2,
+      "name": "Mathematics",
+      "credits": 180
+    }
+  ]
+}
