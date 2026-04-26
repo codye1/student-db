@@ -38,6 +38,19 @@ export async function findAll() {
   return items;
 }
 
+// Потокове проходження по всіх записах без накопичення всього масиву
+export async function* iterateAll() {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  const files = (await fs.readdir(DATA_DIR))
+    .filter((file) => file.endsWith('.json'))
+    .sort();
+
+  for (const file of files) {
+    const content = await fs.readFile(path.join(DATA_DIR, file), 'utf8');
+    yield JSON.parse(content);
+  }
+}
+
 // Зчитати один файл (findById)
 export async function findById(id) {
   const filePath = path.join(DATA_DIR, `${id}.json`);
