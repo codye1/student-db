@@ -1,11 +1,11 @@
 import fs from 'fs/promises';
-import { createReadStream, createWriteStream } from 'fs';
+import { createWriteStream } from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { createGzip } from 'zlib';
+import { iterateAll } from '../repositories/items.repository.js';
 
-const ITEMS_DIR = path.join(process.cwd(), 'data', 'items');
 const BACKUPS_DIR = path.join(process.cwd(), 'data', 'backups');
 
 async function pruneOldBackups(limit = 5) {
@@ -38,18 +38,10 @@ export async function backupData() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFile = path.join(BACKUPS_DIR, `${timestamp}.gz`);
 
-  const files = (await fs.readdir(ITEMS_DIR))
-    .filter((file) => file.endsWith('.json'))
-    .sort();
-
   const source = Readable.from(
     (async function* () {
-      for (const file of files) {
-        const filePath = path.join(ITEMS_DIR, file);
-        for await (const chunk of createReadStream(filePath)) {
-          yield chunk;
-        }
-        yield '\n';
+      for await (const item of iterateAll()) {
+        yield `${JSON.stringify(item)}\n`;
       }
     })()
   );

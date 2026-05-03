@@ -27,6 +27,7 @@
     "check": "npm run lint && npm run format:check",
     "test": "echo \"Error: no test specified\" && exit 1",
     "seed": "node src/scripts/seed.js",
+    "seed:force": "node src/scripts/seed.js --force",
     "migrate": "node src/migrations/migrate.js"
   },
   "devDependencies": {
@@ -52,7 +53,9 @@
     "@fastify/websocket": "^11.2.0",
     "csv-parse": "^5.6.0",
     "csv-stringify": "^6.7.0",
-    "fastify": "^5.8.4"
+    "fastify": "^5.8.4",
+    "fastify-plugin": "^5.0.0",
+    "mysql2": "^3.12.0"
   },
   "imports": {
     "#controllers/*": "./controllers/*.js",

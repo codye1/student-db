@@ -1,95 +1,136 @@
-import fs from 'fs/promises';
-import path from 'path';
 import ItemModel from '../models/item.model.js';
+const TABLE_NAME = 'students';
+let repository = null;
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'items');
-
-// Атомарний запис у файл
-export async function writeAtomic(filePath, data) {
-  const tmp = `${filePath}.tmp`;
-  const dir = path.dirname(filePath);
-  try {
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
-    await fs.rename(tmp, filePath);
-  } catch (error) {
+function normalizeRow(row) {
+  if (!row) return row;
+  const normalized = { ...row };
+  if (Buffer.isBuffer(normalized.grades)) {
+    normalized.grades = normalized.grades.toString('utf8');
+  }
+  if (typeof normalized.grades === 'string') {
     try {
-      await fs.unlink(tmp);
-    } catch (unlinkError) {
-      if (unlinkError.code !== 'ENOENT') {
-        console.error('Failed to cleanup tmp file:', unlinkError);
+      normalized.grades = JSON.parse(normalized.grades);
+    } catch {
+      normalized.grades = [];
+    }
+  }
+  if (!Array.isArray(normalized.grades)) {
+    normalized.grades = [];
+  }
+  return normalized;
+}
+
+export function createItemsRepository(db) {
+  const repo = {
+    findAll: async () => {
+      const [rows] = await db.query(`SELECT * FROM ${TABLE_NAME} ORDER BY id`);
+      return rows.map(normalizeRow);
+    },
+    iterateAll: async function* () {
+      const [rows] = await db.query(`SELECT * FROM ${TABLE_NAME} ORDER BY id`);
+      for (const row of rows) {
+        yield normalizeRow(row);
       }
-    }
-    throw error;
-  }
+    },
+    findById: async (id) => {
+      const [rows] = await db.query(
+        `SELECT * FROM ${TABLE_NAME} WHERE id = ? LIMIT 1`,
+        [id]
+      );
+      return rows.length ? normalizeRow(rows[0]) : null;
+    },
+    create: async (data) => {
+      const item = { ...ItemModel, ...data };
+      const grades = JSON.stringify(item.grades ?? []);
+      const [result] = await db.query(
+        `INSERT INTO ${TABLE_NAME}
+        (name, age, \`group\`, email, grades, course, image, test)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          item.name,
+          item.age,
+          item.group,
+          item.email,
+          grades,
+          item.course,
+          item.image,
+          item.test,
+        ]
+      );
+      return {
+        ...item,
+        id: Number(result.insertId),
+        grades: item.grades ?? [],
+      };
+    },
+    update: async (id, changes) => {
+      const current = await repo.findById(id);
+      if (!current) throw new Error('Not found');
+      const updated = { ...current, ...changes };
+      const grades = JSON.stringify(updated.grades ?? []);
+      await db.query(
+        `UPDATE ${TABLE_NAME}
+        SET name = ?, age = ?, \`group\` = ?, email = ?, grades = ?, course = ?, image = ?, test = ?
+        WHERE id = ?`,
+        [
+          updated.name,
+          updated.age,
+          updated.group,
+          updated.email,
+          grades,
+          updated.course,
+          updated.image,
+          updated.test,
+          id,
+        ]
+      );
+      return updated;
+    },
+    remove: async (id) => {
+      const [result] = await db.query(
+        `DELETE FROM ${TABLE_NAME} WHERE id = ?`,
+        [id]
+      );
+      return result.affectedRows > 0;
+    },
+  };
+  return repo;
 }
 
-// Зчитати всі файли (findAll)
+export function initItemsRepository(db) {
+  repository = createItemsRepository(db);
+}
+
+function getRepository() {
+  if (!repository) {
+    throw new Error('Items repository is not initialized');
+  }
+  return repository;
+}
+
 export async function findAll() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const files = await fs.readdir(DATA_DIR);
-  const items = [];
-  for (const file of files) {
-    if (file.endsWith('.json')) {
-      const content = await fs.readFile(path.join(DATA_DIR, file), 'utf8');
-      items.push(JSON.parse(content));
-    }
-  }
-  return items;
+  return getRepository().findAll();
 }
 
-// Потокове проходження по всіх записах без накопичення всього масиву
 export async function* iterateAll() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const files = (await fs.readdir(DATA_DIR))
-    .filter((file) => file.endsWith('.json'))
-    .sort();
-
-  for (const file of files) {
-    const content = await fs.readFile(path.join(DATA_DIR, file), 'utf8');
-    yield JSON.parse(content);
+  for await (const item of getRepository().iterateAll()) {
+    yield item;
   }
 }
 
-// Зчитати один файл (findById)
 export async function findById(id) {
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-  try {
-    const content = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(content);
-  } catch (err) {
-    if (err.code === 'ENOENT') return null;
-    throw err;
-  }
+  return getRepository().findById(id);
 }
 
-// Створити новий запис (create)
 export async function create(data) {
-  const id = data.id || Date.now().toString();
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-  const item = { ...ItemModel, ...data, id };
-  await writeAtomic(filePath, item);
-  return item;
+  return getRepository().create(data);
 }
 
-// Оновити запис (update)
 export async function update(id, changes) {
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-  const current = await findById(id);
-  if (!current) throw new Error('Not found');
-  const updated = { ...current, ...changes };
-  await writeAtomic(filePath, updated);
-  return updated;
+  return getRepository().update(id, changes);
 }
 
-// Видалити запис (remove)
 export async function remove(id) {
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-  try {
-    await fs.unlink(filePath);
-    return true;
-  } catch (err) {
-    if (err.code === 'ENOENT') return false;
-    throw err;
-  }
+  return getRepository().remove(id);
 }

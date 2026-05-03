@@ -1,27 +1,33 @@
-import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import ItemModel from '../models/item.model.js';
+import fs from 'fs/promises';
 
-const VERSION_FILE = path.join(process.cwd(), 'data', 'version.json');
+const SCHEMA_FILE = path.join(process.cwd(), 'db', 'schema.sql');
 
-async function getModelHash() {
-  const modelStr = JSON.stringify(ItemModel);
-  return crypto.createHash('md5').update(modelStr).digest('hex');
+async function getSchemaHash() {
+  const schemaSql = await fs.readFile(SCHEMA_FILE, 'utf8');
+  return crypto.createHash('md5').update(schemaSql).digest('hex');
 }
 
 export async function checkMigration(fastify) {
-  const modelHash = await getModelHash();
-  let version = { hash: null };
+  const schemaHash = await getSchemaHash();
+  let storedHash = null;
+
   try {
-    const versionContent = await fs.readFile(VERSION_FILE, 'utf8');
-    version = JSON.parse(versionContent);
-  } catch (err) {
-    if (err.code !== 'ENOENT') throw err;
-  }
-  if (version.hash !== modelHash) {
+    const [rows] = await fastify.db.query(
+      'SELECT hash FROM migrations ORDER BY id DESC LIMIT 1'
+    );
+    storedHash = rows.length ? rows[0].hash : null;
+  } catch (error) {
     fastify.log.warn(
-      'Data schema changed. Run "npm run migrate" to update existing files.'
+      'Migrations table not found. Run "npm run migrate" to initialize schema.'
+    );
+    return;
+  }
+
+  if (storedHash !== schemaHash) {
+    fastify.log.warn(
+      'Data schema changed. Run "npm run migrate" to record the new schema hash.'
     );
   }
 }

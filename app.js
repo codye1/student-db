@@ -1,7 +1,9 @@
 import Fastify from 'fastify';
+import fastifyEnv from '@fastify/env';
 import { backupData } from './src/helpers/backup.js';
 import { checkMigration } from './src/helpers/migrationCheck.js';
-import fastifyEnv from '@fastify/env';
+import { loadEnv } from './src/helpers/loadEnv.js';
+import envSchema from './src/config/envSchema.js';
 import gracefulShutdown from '#helpers/gracefulShutdown';
 import router from './router.js';
 import fastifyStatic from '@fastify/static';
@@ -14,22 +16,12 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyWebsocket from '@fastify/websocket';
+import mysqlPlugin from './db/mysql.js';
+import { initItemsRepository } from './src/repositories/items.repository.js';
 
 // ─── Fastify server ──────────────────────────────────────────────────────────
 
-const envSchema = {
-  type: 'object',
-  required: ['PORT', 'HOSTNAME', 'NODE_ENV', 'ADMIN_API_KEY'],
-  properties: {
-    PORT: { type: 'string', default: '3000' },
-    HOSTNAME: { type: 'string', default: '127.0.0.1' },
-    NODE_ENV: { type: 'string', default: 'development' },
-    ADMIN_API_KEY: { type: 'string' },
-    GITHUB_TOKEN: { type: 'string', default: '' },
-  },
-};
-
-const options = {
+const envOptions = {
   schema: envSchema,
   dotenv: true,
 };
@@ -38,10 +30,7 @@ let fastify;
 
 // Бекап даних перед запуском сервера
 (async () => {
-  await backupData();
-  const tempFastify = Fastify();
-  await tempFastify.register(fastifyEnv, options);
-  const env = tempFastify.config;
+  const env = await loadEnv();
 
   let logger;
   if (env.NODE_ENV === 'development') {
@@ -63,8 +52,11 @@ let fastify;
   }
 
   fastify = Fastify({ logger });
+  await fastify.register(fastifyEnv, envOptions);
+  await fastify.register(mysqlPlugin);
+  initItemsRepository(fastify.db);
   await checkMigration(fastify);
-  await fastify.register(fastifyEnv, options);
+  await backupData();
   await fastify.register(fastifySensible);
   await fastify.register(fastifyRateLimit, {
     global: true,
