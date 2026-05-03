@@ -1,6 +1,5 @@
 import Fastify from 'fastify';
 import { backupData } from './src/helpers/backup.js';
-import { checkMigration } from './src/helpers/migrationCheck.js';
 import fastifyEnv from '@fastify/env';
 import gracefulShutdown from '#helpers/gracefulShutdown';
 import router from './router.js';
@@ -14,18 +13,29 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyWebsocket from '@fastify/websocket';
+import mongoPlugin from './db/mongo.js';
+import { initItemsRepository } from './src/repositories/items.repository.js';
 
 // ─── Fastify server ──────────────────────────────────────────────────────────
 
 const envSchema = {
   type: 'object',
-  required: ['PORT', 'HOSTNAME', 'NODE_ENV', 'ADMIN_API_KEY'],
+  required: [
+    'PORT',
+    'HOSTNAME',
+    'NODE_ENV',
+    'ADMIN_API_KEY',
+    'MONGO_URL',
+    'MONGO_DB_NAME',
+  ],
   properties: {
     PORT: { type: 'string', default: '3000' },
     HOSTNAME: { type: 'string', default: '127.0.0.1' },
     NODE_ENV: { type: 'string', default: 'development' },
     ADMIN_API_KEY: { type: 'string' },
     GITHUB_TOKEN: { type: 'string', default: '' },
+    MONGO_URL: { type: 'string' },
+    MONGO_DB_NAME: { type: 'string' },
   },
 };
 
@@ -38,7 +48,6 @@ let fastify;
 
 // Бекап даних перед запуском сервера
 (async () => {
-  await backupData();
   const tempFastify = Fastify();
   await tempFastify.register(fastifyEnv, options);
   const env = tempFastify.config;
@@ -63,8 +72,10 @@ let fastify;
   }
 
   fastify = Fastify({ logger });
-  await checkMigration(fastify);
   await fastify.register(fastifyEnv, options);
+  await fastify.register(mongoPlugin);
+  initItemsRepository(fastify.db);
+  await backupData();
   await fastify.register(fastifySensible);
   await fastify.register(fastifyRateLimit, {
     global: true,

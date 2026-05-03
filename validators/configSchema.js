@@ -1,6 +1,6 @@
 const configSchema = {
   type: 'object',
-  required: ['PORT', 'HOSTNAME', 'NODE_ENV'],
+  required: ['PORT', 'HOSTNAME', 'NODE_ENV', 'MONGO_URL', 'MONGO_DB_NAME'],
   additionalProperties: false,
   properties: {
     PORT: {
@@ -16,6 +16,16 @@ const configSchema = {
     NODE_ENV: {
       type: 'string',
       enum: ['development', 'production'],
+    },
+    MONGO_URL: {
+      type: 'string',
+      minLength: 1,
+      pattern: '\\S',
+    },
+    MONGO_DB_NAME: {
+      type: 'string',
+      minLength: 1,
+      pattern: '\\S',
     },
   },
 };

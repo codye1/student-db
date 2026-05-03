@@ -1,4 +1,7 @@
-import { create } from '../repositories/items.repository.js';
+import Fastify from 'fastify';
+import fastifyEnv from '@fastify/env';
+import mongoose from 'mongoose';
+import { getStudentModel } from '../../db/models/student.model.js';
 
 const students = [
   {
@@ -31,10 +34,46 @@ const students = [
 ];
 
 async function seed() {
-  for (const student of students) {
-    await create(student);
+  const envSchema = {
+    type: 'object',
+    required: ['MONGO_URL', 'MONGO_DB_NAME'],
+    properties: {
+      MONGO_URL: { type: 'string' },
+      MONGO_DB_NAME: { type: 'string' },
+    },
+  };
+
+  const envOptions = { schema: envSchema, dotenv: true };
+  const tempFastify = Fastify();
+  await tempFastify.register(fastifyEnv, envOptions);
+  const config = tempFastify.config;
+
+  await mongoose.connect(config.MONGO_URL, { dbName: config.MONGO_DB_NAME });
+  const Student = getStudentModel(mongoose.connection);
+
+  const isForce = process.argv.includes('--force');
+  if (isForce) {
+    await Student.deleteMany({});
+  } else {
+    const count = await Student.countDocuments();
+    if (count > 0) {
+      console.log('Seed skipped: collection is not empty.');
+      await mongoose.disconnect();
+      return;
+    }
   }
+
+  const docs = students.map(({ id, ...rest }) => ({
+    _id: String(id),
+    ...rest,
+  }));
+
+  await Student.insertMany(docs);
+  await mongoose.disconnect();
   console.log('Seed completed!');
 }
 
-seed();
+seed().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
