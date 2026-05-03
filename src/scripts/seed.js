@@ -1,5 +1,9 @@
 import mysql from 'mysql2/promise';
+import { drizzle } from 'drizzle-orm/mysql2';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 import { createItemsRepository } from '../repositories/items.repository.js';
+import { students as studentsTable } from '../../db/schema.js';
 import { loadEnv } from '../helpers/loadEnv.js';
 
 const students = [
@@ -30,6 +34,15 @@ const students = [
 ];
 
 async function seed({ force } = {}) {
+  const drizzleKitBin = path.join(process.cwd(), 'node_modules', 'drizzle-kit', 'bin.cjs');
+  const migrateResult = spawnSync(process.execPath, [drizzleKitBin, 'migrate'], {
+    stdio: 'inherit',
+  });
+
+  if (migrateResult.status !== 0) {
+    throw new Error('Schema migration failed before seeding');
+  }
+
   const env = await loadEnv();
   const pool = mysql.createPool({
     host: env.MYSQL_HOST,
@@ -41,16 +54,15 @@ async function seed({ force } = {}) {
     connectionLimit: 5,
     queueLimit: 0,
   });
-  const repo = createItemsRepository(pool);
+  const db = drizzle(pool);
+  const repo = createItemsRepository(db);
 
   try {
     if (force) {
       await pool.query('TRUNCATE TABLE students');
     } else {
-      const [rows] = await pool.query(
-        'SELECT COUNT(*) AS count FROM students'
-      );
-      if (rows[0].count > 0) {
+      const rows = await db.select().from(studentsTable);
+      if (rows.length > 0) {
         console.log('Seed skipped: table is not empty.');
         return;
       }

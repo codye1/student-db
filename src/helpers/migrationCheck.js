@@ -1,33 +1,51 @@
-import path from 'path';
-import crypto from 'crypto';
-import fs from 'fs/promises';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
-const SCHEMA_FILE = path.join(process.cwd(), 'db', 'schema.sql');
+const JOURNAL_FILE = path.join(process.cwd(), 'db', 'migrations', 'meta', '_journal.json');
 
-async function getSchemaHash() {
-  const schemaSql = await fs.readFile(SCHEMA_FILE, 'utf8');
-  return crypto.createHash('md5').update(schemaSql).digest('hex');
+async function getGeneratedMigrationCount() {
+  try {
+    const content = await fs.readFile(JOURNAL_FILE, 'utf8');
+    const journal = JSON.parse(content);
+    return Array.isArray(journal.entries) ? journal.entries.length : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function checkMigration(fastify) {
-  const schemaHash = await getSchemaHash();
-  let storedHash = null;
-
   try {
-    const [rows] = await fastify.db.query(
-      'SELECT hash FROM migrations ORDER BY id DESC LIMIT 1'
-    );
-    storedHash = rows.length ? rows[0].hash : null;
-  } catch (error) {
-    fastify.log.warn(
-      'Migrations table not found. Run "npm run migrate" to initialize schema.'
-    );
-    return;
-  }
+    if (!fastify.db) {
+      fastify.log.warn('Database connection is not available');
+      return;
+    }
 
-  if (storedHash !== schemaHash) {
+    const expectedCount = await getGeneratedMigrationCount();
+    if (!expectedCount) {
+      return;
+    }
+
+    const [tableRows] = await fastify.db.query(
+      "SHOW TABLES LIKE '__drizzle_migrations'"
+    );
+    if (!tableRows.length) {
+      fastify.log.warn(
+        'Drizzle migrations table not found. Run "npm run migrate" to initialize schema.'
+      );
+      return;
+    }
+
+    const [rows] = await fastify.db.query('SELECT COUNT(*) AS count FROM __drizzle_migrations');
+    const appliedCount = Number(rows?.[0]?.count ?? 0);
+
+    if (appliedCount < expectedCount) {
+      fastify.log.warn(
+        'There are pending Drizzle migrations. Run "npm run migrate" before starting the app.'
+      );
+    }
+  } catch {
     fastify.log.warn(
-      'Data schema changed. Run "npm run migrate" to record the new schema hash.'
+      'Drizzle migrations table not found. Run "npm run migrate" to initialize schema.'
     );
   }
 }

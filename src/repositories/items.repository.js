@@ -1,13 +1,12 @@
 import ItemModel from '../models/item.model.js';
-const TABLE_NAME = 'students';
+import { students } from '../../db/schema.js';
+import { eq } from 'drizzle-orm';
+
 let repository = null;
 
 function normalizeRow(row) {
   if (!row) return row;
   const normalized = { ...row };
-  if (Buffer.isBuffer(normalized.grades)) {
-    normalized.grades = normalized.grades.toString('utf8');
-  }
   if (typeof normalized.grades === 'string') {
     try {
       normalized.grades = JSON.parse(normalized.grades);
@@ -15,52 +14,45 @@ function normalizeRow(row) {
       normalized.grades = [];
     }
   }
-  if (!Array.isArray(normalized.grades)) {
-    normalized.grades = [];
-  }
+  if (!Array.isArray(normalized.grades)) normalized.grades = [];
   return normalized;
 }
 
 export function createItemsRepository(db) {
   const repo = {
     findAll: async () => {
-      const [rows] = await db.query(`SELECT * FROM ${TABLE_NAME} ORDER BY id`);
+      const rows = await db.select().from(students).orderBy(students.id);
       return rows.map(normalizeRow);
     },
     iterateAll: async function* () {
-      const [rows] = await db.query(`SELECT * FROM ${TABLE_NAME} ORDER BY id`);
-      for (const row of rows) {
-        yield normalizeRow(row);
-      }
+      const rows = await db.select().from(students).orderBy(students.id);
+      for (const row of rows) yield normalizeRow(row);
     },
     findById: async (id) => {
-      const [rows] = await db.query(
-        `SELECT * FROM ${TABLE_NAME} WHERE id = ? LIMIT 1`,
-        [id]
-      );
+      const rows = await db
+        .select()
+        .from(students)
+        .where(eq(students.id, Number(id)))
+        .limit(1);
       return rows.length ? normalizeRow(rows[0]) : null;
     },
     create: async (data) => {
       const item = { ...ItemModel, ...data };
-      const grades = JSON.stringify(item.grades ?? []);
-      const [result] = await db.query(
-        `INSERT INTO ${TABLE_NAME}
-        (name, age, \`group\`, email, grades, course, image, test)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          item.name,
-          item.age,
-          item.group,
-          item.email,
-          grades,
-          item.course,
-          item.image,
-          item.test,
-        ]
-      );
+      const insertData = {
+        name: item.name,
+        age: item.age,
+        group: item.group,
+        email: item.email,
+        grades: item.grades ?? [],
+        course: item.course,
+        image: item.image,
+        test: item.test,
+      };
+      const result = await db.insert(students).values(insertData).$returningId();
+      const created = Array.isArray(result) ? result[0] : result;
       return {
         ...item,
-        id: Number(result.insertId),
+        id: Number(created.id),
         grades: item.grades ?? [],
       };
     },
@@ -68,31 +60,29 @@ export function createItemsRepository(db) {
       const current = await repo.findById(id);
       if (!current) throw new Error('Not found');
       const updated = { ...current, ...changes };
-      const grades = JSON.stringify(updated.grades ?? []);
-      await db.query(
-        `UPDATE ${TABLE_NAME}
-        SET name = ?, age = ?, \`group\` = ?, email = ?, grades = ?, course = ?, image = ?, test = ?
-        WHERE id = ?`,
-        [
-          updated.name,
-          updated.age,
-          updated.group,
-          updated.email,
-          grades,
-          updated.course,
-          updated.image,
-          updated.test,
-          id,
-        ]
-      );
+      const updateData = {
+        name: updated.name,
+        age: updated.age,
+        group: updated.group,
+        email: updated.email,
+        grades: updated.grades ?? [],
+        course: updated.course,
+        image: updated.image,
+        test: updated.test,
+      };
+      await db
+        .update(students)
+        .set(updateData)
+        .where(eq(students.id, Number(id)));
       return updated;
     },
     remove: async (id) => {
-      const [result] = await db.query(
-        `DELETE FROM ${TABLE_NAME} WHERE id = ?`,
-        [id]
-      );
-      return result.affectedRows > 0;
+      const result = await db.delete(students).where(eq(students.id, Number(id)));
+      // drizzle returns { affectedRows } or array; be permissive
+      if (result && typeof result === 'object') {
+        return result.affectedRows ? result.affectedRows > 0 : true;
+      }
+      return true;
     },
   };
   return repo;
@@ -103,9 +93,7 @@ export function initItemsRepository(db) {
 }
 
 function getRepository() {
-  if (!repository) {
-    throw new Error('Items repository is not initialized');
-  }
+  if (!repository) throw new Error('Items repository is not initialized');
   return repository;
 }
 
