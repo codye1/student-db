@@ -1,4 +1,6 @@
 import fs from 'fs/promises';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import path from 'path';
 import {
   update,
@@ -6,8 +8,8 @@ import {
   remove,
 } from '../src/repositories/items.repository.js';
 import { getImageUrl } from '../helpers/imageUrl.js';
-import { findAll, create } from '../src/repositories/items.repository.js';
-import { studentsToCsv } from '../helpers/csv.js';
+import { findAll, create, iterateAll } from '../src/repositories/items.repository.js';
+import { stringify } from 'csv-stringify';
 import { parseImportFile } from '../helpers/csvImport.js';
 import studentCreateBodySchema from '../schemas/studentCreateBodySchema.js';
 import Ajv from 'ajv';
@@ -20,6 +22,9 @@ import {
   getExternalCourseDetails,
   getFallbackCourseDetails,
 } from '#services/externalReference.service';
+import StudentAvgGradeTransform from '../src/transforms/studentAvgGradeTransform.js';
+import StudentNdjsonTransform from '../src/transforms/studentNdjsonTransform.js';
+import { eventsBus } from '../src/helpers/eventsBus.js';
 
 const studentResponseSchema = {
   type: 'object',
@@ -110,6 +115,53 @@ const itemDetailsResponseSchema = {
   },
 };
 
+const exportQuerySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    transform: {
+      type: 'boolean',
+      default: false,
+    },
+  },
+};
+
+const exportStudentsCsvHandler = async (request, reply) => {
+  const shouldTransform =
+    request.query.transform === true || request.query.transform === 'true';
+
+  const source = Readable.from(
+    (async function* () {
+      for await (const item of iterateAll()) {
+        yield {
+          ...item,
+          image: item.image ? getImageUrl(item, request) : '',
+        };
+      }
+    })()
+  );
+
+  const streams = [source];
+
+  if (shouldTransform) {
+    streams.push(new StudentAvgGradeTransform());
+  }
+
+  reply.header('Content-Type', 'text/csv');
+  reply.header('Content-Disposition', 'attachment; filename="students.csv"');
+
+  try {
+    streams.push(stringify({ header: true }), reply.raw);
+    await pipeline(...streams);
+  } catch (error) {
+    request.log.error(error, 'CSV export failed');
+    if (!reply.sent) {
+      return reply.code(500).send({ error: 'Failed to export CSV' });
+    }
+    reply.raw.destroy(error);
+  }
+};
+
 export const studentRoutes = [
   {
     method: 'POST',
@@ -157,7 +209,8 @@ export const studentRoutes = [
         writeStream.on('finish', resolve);
         writeStream.on('error', reject);
       });
-      await update(id, { image: relPath });
+      const updatedStudent = await update(id, { image: relPath });
+      eventsBus.emit('students:updated', updatedStudent);
       reply.code(200).send({
         image: getImageUrl({ ...student, image: relPath }, request),
       });
@@ -210,7 +263,8 @@ export const studentRoutes = [
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (validate(item)) {
-          await create(item);
+          const createdItem = await create(item);
+          eventsBus.emit('students:created', createdItem);
           imported++;
         } else {
           rejected.push({
@@ -228,25 +282,25 @@ export const studentRoutes = [
     schema: {
       tags: ['Students'],
       summary: 'Export students as CSV',
+      querystring: exportQuerySchema,
       response: {
         200: { type: 'string' },
       },
     },
-    handler: async (request, reply) => {
-      const items = await findAll();
-      // Формування повного URL для image
-      const getImageUrl = (item) =>
-        item.image
-          ? `${request.protocol}://${request.hostname}/uploads${item.image}`
-          : '';
-      const csv = studentsToCsv(items, getImageUrl);
-      reply.header('Content-Type', 'text/csv');
-      reply.header(
-        'Content-Disposition',
-        'attachment; filename="students.csv"'
-      );
-      reply.code(200).send(csv);
+    handler: exportStudentsCsvHandler,
+  },
+  {
+    method: 'GET',
+    url: '/items/export',
+    schema: {
+      tags: ['Students'],
+      summary: 'Export students as CSV',
+      querystring: exportQuerySchema,
+      response: {
+        200: { type: 'string' },
+      },
     },
+    handler: exportStudentsCsvHandler,
   },
   {
     method: 'GET',
@@ -267,6 +321,35 @@ export const studentRoutes = [
           ? students.filter((s) => s.course === course)
           : students;
       reply.code(200).send(filtered);
+    },
+  },
+  {
+    method: 'GET',
+    url: '/students/stream',
+    schema: {
+      tags: ['Students'],
+      summary: 'Stream students as NDJSON',
+      response: {
+        200: { type: 'string' },
+      },
+    },
+    handler: async (request, reply) => {
+      const source = Readable.from(
+        (async function* () {
+          for await (const item of iterateAll()) {
+            yield item;
+          }
+        })()
+      );
+
+      const ndjsonStream = source.pipe(new StudentNdjsonTransform());
+
+      ndjsonStream.on('error', (error) => {
+        request.log.error(error, 'NDJSON stream failed');
+      });
+
+      reply.type('application/x-ndjson');
+      return reply.send(ndjsonStream);
     },
   },
   {
@@ -322,6 +405,7 @@ export const studentRoutes = [
         course,
         email,
       });
+      eventsBus.emit('students:created', student);
       reply.code(201).send(student);
     },
   },
@@ -351,6 +435,7 @@ export const studentRoutes = [
         return reply.code(404).send({ error: STUDENT_NOT_FOUND(id) });
       }
       const updated = await update(id, patch);
+      eventsBus.emit('students:updated', updated);
       reply.code(200).send(updated);
     },
   },
@@ -373,6 +458,7 @@ export const studentRoutes = [
         return reply.code(404).send({ error: STUDENT_NOT_FOUND(id) });
       }
       await remove(id);
+      eventsBus.emit('students:deleted', { id: student.id ?? id });
       reply.code(200).send({
         message: `Student "${student.name}" has been expelled`,
         student,

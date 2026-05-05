@@ -13,6 +13,7 @@ import fastifyMultipart from '@fastify/multipart';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastifyWebsocket from '@fastify/websocket';
 
 // ─── Fastify server ──────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ let fastify;
     origin: isDev ? '*' : 'https://your-production-domain.com',
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   });
+  await fastify.register(fastifyWebsocket);
 
   fastify.addHook('onClose', async (instance, done) => {
     process.stdout.write('[FASTIFY] Server is closing...\n');
