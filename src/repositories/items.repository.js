@@ -1,95 +1,124 @@
-import fs from 'fs/promises';
-import path from 'path';
 import ItemModel from '../models/item.model.js';
+import { students } from '../../db/schema.js';
+import { eq } from 'drizzle-orm';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'items');
+let repository = null;
 
-// Атомарний запис у файл
-export async function writeAtomic(filePath, data) {
-  const tmp = `${filePath}.tmp`;
-  const dir = path.dirname(filePath);
-  try {
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
-    await fs.rename(tmp, filePath);
-  } catch (error) {
+function normalizeRow(row) {
+  if (!row) return row;
+  const normalized = { ...row };
+  if (typeof normalized.grades === 'string') {
     try {
-      await fs.unlink(tmp);
-    } catch (unlinkError) {
-      if (unlinkError.code !== 'ENOENT') {
-        console.error('Failed to cleanup tmp file:', unlinkError);
+      normalized.grades = JSON.parse(normalized.grades);
+    } catch {
+      normalized.grades = [];
+    }
+  }
+  if (!Array.isArray(normalized.grades)) normalized.grades = [];
+  return normalized;
+}
+
+export function createItemsRepository(db) {
+  const repo = {
+    findAll: async () => {
+      const rows = await db.select().from(students).orderBy(students.id);
+      return rows.map(normalizeRow);
+    },
+    iterateAll: async function* () {
+      const rows = await db.select().from(students).orderBy(students.id);
+      for (const row of rows) yield normalizeRow(row);
+    },
+    findById: async (id) => {
+      const rows = await db
+        .select()
+        .from(students)
+        .where(eq(students.id, Number(id)))
+        .limit(1);
+      return rows.length ? normalizeRow(rows[0]) : null;
+    },
+    create: async (data) => {
+      const item = { ...ItemModel, ...data };
+      const insertData = {
+        name: item.name,
+        age: item.age,
+        group: item.group,
+        email: item.email,
+        grades: item.grades ?? [],
+        course: item.course,
+        image: item.image,
+        test: item.test,
+      };
+      const result = await db.insert(students).values(insertData).$returningId();
+      const created = Array.isArray(result) ? result[0] : result;
+      return {
+        ...item,
+        id: Number(created.id),
+        grades: item.grades ?? [],
+      };
+    },
+    update: async (id, changes) => {
+      const current = await repo.findById(id);
+      if (!current) throw new Error('Not found');
+      const updated = { ...current, ...changes };
+      const updateData = {
+        name: updated.name,
+        age: updated.age,
+        group: updated.group,
+        email: updated.email,
+        grades: updated.grades ?? [],
+        course: updated.course,
+        image: updated.image,
+        test: updated.test,
+      };
+      await db
+        .update(students)
+        .set(updateData)
+        .where(eq(students.id, Number(id)));
+      return updated;
+    },
+    remove: async (id) => {
+      const result = await db.delete(students).where(eq(students.id, Number(id)));
+      // drizzle returns { affectedRows } or array; be permissive
+      if (result && typeof result === 'object') {
+        return result.affectedRows ? result.affectedRows > 0 : true;
       }
-    }
-    throw error;
-  }
+      return true;
+    },
+  };
+  return repo;
 }
 
-// Зчитати всі файли (findAll)
+export function initItemsRepository(db) {
+  repository = createItemsRepository(db);
+}
+
+function getRepository() {
+  if (!repository) throw new Error('Items repository is not initialized');
+  return repository;
+}
+
 export async function findAll() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const files = await fs.readdir(DATA_DIR);
-  const items = [];
-  for (const file of files) {
-    if (file.endsWith('.json')) {
-      const content = await fs.readFile(path.join(DATA_DIR, file), 'utf8');
-      items.push(JSON.parse(content));
-    }
-  }
-  return items;
+  return getRepository().findAll();
 }
 
-// Потокове проходження по всіх записах без накопичення всього масиву
 export async function* iterateAll() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const files = (await fs.readdir(DATA_DIR))
-    .filter((file) => file.endsWith('.json'))
-    .sort();
-
-  for (const file of files) {
-    const content = await fs.readFile(path.join(DATA_DIR, file), 'utf8');
-    yield JSON.parse(content);
+  for await (const item of getRepository().iterateAll()) {
+    yield item;
   }
 }
 
-// Зчитати один файл (findById)
 export async function findById(id) {
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-  try {
-    const content = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(content);
-  } catch (err) {
-    if (err.code === 'ENOENT') return null;
-    throw err;
-  }
+  return getRepository().findById(id);
 }
 
-// Створити новий запис (create)
 export async function create(data) {
-  const id = data.id || Date.now().toString();
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-  const item = { ...ItemModel, ...data, id };
-  await writeAtomic(filePath, item);
-  return item;
+  return getRepository().create(data);
 }
 
-// Оновити запис (update)
 export async function update(id, changes) {
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-  const current = await findById(id);
-  if (!current) throw new Error('Not found');
-  const updated = { ...current, ...changes };
-  await writeAtomic(filePath, updated);
-  return updated;
+  return getRepository().update(id, changes);
 }
 
-// Видалити запис (remove)
 export async function remove(id) {
-  const filePath = path.join(DATA_DIR, `${id}.json`);
-  try {
-    await fs.unlink(filePath);
-    return true;
-  } catch (err) {
-    if (err.code === 'ENOENT') return false;
-    throw err;
-  }
+  return getRepository().remove(id);
 }

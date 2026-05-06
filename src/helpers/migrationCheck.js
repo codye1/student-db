@@ -1,27 +1,51 @@
-import fs from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
-import ItemModel from '../models/item.model.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
-const VERSION_FILE = path.join(process.cwd(), 'data', 'version.json');
+const JOURNAL_FILE = path.join(process.cwd(), 'db', 'migrations', 'meta', '_journal.json');
 
-async function getModelHash() {
-  const modelStr = JSON.stringify(ItemModel);
-  return crypto.createHash('md5').update(modelStr).digest('hex');
+async function getGeneratedMigrationCount() {
+  try {
+    const content = await fs.readFile(JOURNAL_FILE, 'utf8');
+    const journal = JSON.parse(content);
+    return Array.isArray(journal.entries) ? journal.entries.length : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function checkMigration(fastify) {
-  const modelHash = await getModelHash();
-  let version = { hash: null };
   try {
-    const versionContent = await fs.readFile(VERSION_FILE, 'utf8');
-    version = JSON.parse(versionContent);
-  } catch (err) {
-    if (err.code !== 'ENOENT') throw err;
-  }
-  if (version.hash !== modelHash) {
+    if (!fastify.db) {
+      fastify.log.warn('Database connection is not available');
+      return;
+    }
+
+    const expectedCount = await getGeneratedMigrationCount();
+    if (!expectedCount) {
+      return;
+    }
+
+    const [tableRows] = await fastify.db.query(
+      "SHOW TABLES LIKE '__drizzle_migrations'"
+    );
+    if (!tableRows.length) {
+      fastify.log.warn(
+        'Drizzle migrations table not found. Run "npm run migrate" to initialize schema.'
+      );
+      return;
+    }
+
+    const [rows] = await fastify.db.query('SELECT COUNT(*) AS count FROM __drizzle_migrations');
+    const appliedCount = Number(rows?.[0]?.count ?? 0);
+
+    if (appliedCount < expectedCount) {
+      fastify.log.warn(
+        'There are pending Drizzle migrations. Run "npm run migrate" before starting the app.'
+      );
+    }
+  } catch {
     fastify.log.warn(
-      'Data schema changed. Run "npm run migrate" to update existing files.'
+      'Drizzle migrations table not found. Run "npm run migrate" to initialize schema.'
     );
   }
 }

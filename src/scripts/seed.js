@@ -1,8 +1,13 @@
-import { create } from '../repositories/items.repository.js';
+import mysql from 'mysql2/promise';
+import { drizzle } from 'drizzle-orm/mysql2';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { createItemsRepository } from '../repositories/items.repository.js';
+import { students as studentsTable } from '../../db/schema.js';
+import { loadEnv } from '../helpers/loadEnv.js';
 
 const students = [
   {
-    id: '1',
     name: 'Іван Петренко',
     age: 20,
     group: 'ІП-21',
@@ -11,7 +16,6 @@ const students = [
     course: 2,
   },
   {
-    id: '2',
     name: 'Олена Коваль',
     age: 19,
     group: 'ІП-22',
@@ -20,7 +24,6 @@ const students = [
     course: 2,
   },
   {
-    id: '3',
     name: 'Максим Бондар',
     age: 21,
     group: 'ІП-21',
@@ -30,11 +33,54 @@ const students = [
   },
 ];
 
-async function seed() {
-  for (const student of students) {
-    await create(student);
+async function seed({ force } = {}) {
+  const drizzleKitBin = path.join(process.cwd(), 'node_modules', 'drizzle-kit', 'bin.cjs');
+  const migrateResult = spawnSync(process.execPath, [drizzleKitBin, 'migrate'], {
+    stdio: 'inherit',
+  });
+
+  if (migrateResult.status !== 0) {
+    throw new Error('Schema migration failed before seeding');
   }
-  console.log('Seed completed!');
+
+  const env = await loadEnv();
+  const pool = mysql.createPool({
+    host: env.MYSQL_HOST,
+    port: Number(env.MYSQL_PORT),
+    user: env.MYSQL_USER,
+    password: env.MYSQL_PASSWORD,
+    database: env.MYSQL_DB,
+    waitForConnections: true,
+    connectionLimit: 5,
+    queueLimit: 0,
+  });
+  const db = drizzle(pool);
+  const repo = createItemsRepository(db);
+
+  try {
+    if (force) {
+      await pool.query('TRUNCATE TABLE students');
+    } else {
+      const rows = await db.select().from(studentsTable);
+      if (rows.length > 0) {
+        console.log('Seed skipped: table is not empty.');
+        return;
+      }
+    }
+
+    for (const student of students) {
+      await repo.create(student);
+    }
+
+    console.log('Seed completed!');
+  } finally {
+    await pool.end();
+  }
 }
 
-seed();
+const force = process.argv.includes('--force') || process.argv.includes('-f');
+
+seed({ force }).catch((error) => {
+  console.error(`[SEED ERROR] ${error.message}`);
+  process.exit(1);
+});
