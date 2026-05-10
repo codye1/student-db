@@ -13,11 +13,15 @@ import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyRateLimit from '@fastify/rate-limit';
+import fastifyCookie from '@fastify/cookie';
+import fastifySession from '@fastify/session';
+import RedisStore from 'fastify-session-redis-store';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyWebsocket from '@fastify/websocket';
 import mysqlPlugin from './db/mysql.js';
 import { initItemsRepository } from './src/repositories/items.repository.js';
+import { initUsersRepository } from './src/repositories/users.repository.js';
 import redisPlugin from './src/plugins/redis.js';
 
 // ─── Fastify server ──────────────────────────────────────────────────────────
@@ -58,10 +62,27 @@ let fastify;
   const drizzlePlugin = await import('./db/drizzle.js');
   await fastify.register(drizzlePlugin.default);
   initItemsRepository(fastify.drizzle);
+  initUsersRepository(fastify.drizzle);
   await checkMigration(fastify);
   await backupData();
   await fastify.register(fastifySensible);
   await fastify.register(redisPlugin);
+  await fastify.register(fastifyCookie);
+  await fastify.register(fastifySession, {
+    secret: fastify.config.SESSION_SECRET,
+    cookieName: 'student-db-session',
+    saveUninitialized: false,
+    store: new RedisStore({
+      client: fastify.redis,
+      ttl: 24 * 60 * 60,
+    }),
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  });
   await fastify.register(fastifyRateLimit, {
     global: true,
     redis: fastify.redis,

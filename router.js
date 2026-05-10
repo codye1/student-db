@@ -2,6 +2,7 @@ import {
   buildStudentRoutes,
   buildStudentRoutesV2,
 } from '#controllers/students.controller';
+import { buildAuthRoutes } from '#controllers/auth.controller';
 import { githubRoutesV1, githubRoutesV2 } from '#controllers/github.controller';
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
@@ -57,6 +58,7 @@ export default async function router(fastify) {
 
   const v1Routes = async (instance) => {
     const studentRoutes = buildStudentRoutes({ redis: fastify.redis });
+    const authRoutes = buildAuthRoutes();
     const requireAdminApiKey = (request, reply, done) => {
       const apiKey = request.headers['x-api-key'];
       if (!apiKey || apiKey !== instance.config.ADMIN_API_KEY) {
@@ -69,6 +71,28 @@ export default async function router(fastify) {
       }
       done();
     };
+
+    const requireSession = (request, reply, done) => {
+      if (!request.session?.user) {
+        reply.code(401).send({ error: 'Unauthorized' });
+        return;
+      }
+      done();
+    };
+
+    instance.addHook('onRequest', (request, reply, done) => {
+      const urlPath = String(request.raw.url || '').split('?')[0];
+      const isStudentsMutation =
+        ['POST', 'PATCH', 'DELETE'].includes(request.method) &&
+        (urlPath.startsWith('/students') ||
+          urlPath.startsWith('/api/v1/students'));
+
+      if (isStudentsMutation) {
+        return requireSession(request, reply, done);
+      }
+
+      done();
+    });
 
     instance.route({
       method: 'GET',
@@ -233,6 +257,7 @@ export default async function router(fastify) {
 
     // Students routes
     registerRoutes(instance, studentRoutes);
+    registerRoutes(instance, authRoutes);
     registerRoutes(instance, githubRoutesV1);
   };
 
