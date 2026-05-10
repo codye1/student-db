@@ -19,17 +19,19 @@ import studentParamsSchema from '../schemas/studentParamsSchema.js';
 import studentPatchBodySchema from '../schemas/studentPatchBodySchema.js';
 import { STUDENT_NOT_FOUND } from '../constants/errors.js';
 import {
-  getExternalCourseDetails,
+  createExternalReferenceService,
   getFallbackCourseDetails,
 } from '#services/externalReference.service';
 import StudentAvgGradeTransform from '../src/transforms/studentAvgGradeTransform.js';
 import StudentNdjsonTransform from '../src/transforms/studentNdjsonTransform.js';
 import { eventsBus } from '../src/helpers/eventsBus.js';
+import { createStudentsCacheService } from '#services/studentsCache.service';
+import { redisKeys } from '../constants/redisKeys.js';
 
 const studentResponseSchema = {
   type: 'object',
   properties: {
-    id: { type: 'integer' },
+    id: { anyOf: [{ type: 'integer' }, { type: 'string' }] },
     name: { type: 'string' },
     grades: { type: 'array', items: { type: 'integer' } },
     course: { type: 'integer' },
@@ -162,7 +164,17 @@ const exportStudentsCsvHandler = async (request, reply) => {
   }
 };
 
-export const studentRoutes = [
+export const buildStudentRoutes = ({ redis }) => {
+  const externalReferenceService = createExternalReferenceService({
+    redis,
+    redisKeys,
+  });
+  const studentsCacheService = createStudentsCacheService({
+    redis,
+    redisKeys,
+  });
+
+  return [
   {
     method: 'POST',
     url: '/students/:id/image',
@@ -211,6 +223,7 @@ export const studentRoutes = [
       });
       const updatedStudent = await update(id, { image: relPath });
       eventsBus.emit('students:updated', updatedStudent);
+      await studentsCacheService.invalidateStudentsCache();
       reply.code(200).send({
         image: getImageUrl({ ...student, image: relPath }, request),
       });
@@ -273,6 +286,7 @@ export const studentRoutes = [
           });
         }
       }
+      await studentsCacheService.invalidateStudentsCache();
       reply.code(200).send({ imported, rejected });
     },
   },
@@ -373,7 +387,9 @@ export const studentRoutes = [
       }
 
       try {
-        const courseDetails = await getExternalCourseDetails(item.course);
+        const courseDetails = await externalReferenceService.getExternalCourseDetails(
+          item.course
+        );
         return reply.code(200).send({
           ...item,
           courseDetails,
@@ -406,6 +422,7 @@ export const studentRoutes = [
         email,
       });
       eventsBus.emit('students:created', student);
+      await studentsCacheService.invalidateStudentsCache();
       reply.code(201).send(student);
     },
   },
@@ -436,6 +453,7 @@ export const studentRoutes = [
       }
       const updated = await update(id, patch);
       eventsBus.emit('students:updated', updated);
+      await studentsCacheService.invalidateStudentsCache();
       reply.code(200).send(updated);
     },
   },
@@ -459,15 +477,23 @@ export const studentRoutes = [
       }
       await remove(id);
       eventsBus.emit('students:deleted', { id: student.id ?? id });
+      await studentsCacheService.invalidateStudentsCache();
       reply.code(200).send({
         message: `Student "${student.name}" has been expelled`,
         student,
       });
     },
   },
-];
+  ];
+};
 
-export const studentRoutesV2 = [
+export const buildStudentRoutesV2 = ({ redis }) => {
+  const studentsCacheService = createStudentsCacheService({
+    redis,
+    redisKeys,
+  });
+
+  return [
   {
     method: 'GET',
     url: '/students',
@@ -484,6 +510,16 @@ export const studentRoutesV2 = [
       const limit = Number(request.query.limit ?? 10);
       const { course } = request.query;
 
+      const cached = await studentsCacheService.getStudentsPage({
+        page,
+        limit,
+        course,
+      });
+
+      if (cached) {
+        return reply.code(200).send(cached);
+      }
+
       const students = await findAll();
       const filtered =
         course !== undefined
@@ -494,7 +530,7 @@ export const studentRoutesV2 = [
       const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
       const offset = (page - 1) * limit;
 
-      return reply.code(200).send({
+      const payload = {
         data: filtered.slice(offset, offset + limit),
         meta: {
           total,
@@ -502,7 +538,15 @@ export const studentRoutesV2 = [
           limit,
           totalPages,
         },
-      });
+      };
+
+      await studentsCacheService.setStudentsPage(
+        { page, limit, course },
+        payload
+      );
+
+      return reply.code(200).send(payload);
     },
   },
-];
+  ];
+};

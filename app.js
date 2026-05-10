@@ -18,6 +18,7 @@ import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyWebsocket from '@fastify/websocket';
 import mysqlPlugin from './db/mysql.js';
 import { initItemsRepository } from './src/repositories/items.repository.js';
+import redisPlugin from './src/plugins/redis.js';
 
 // ─── Fastify server ──────────────────────────────────────────────────────────
 
@@ -60,8 +61,10 @@ let fastify;
   await checkMigration(fastify);
   await backupData();
   await fastify.register(fastifySensible);
+  await fastify.register(redisPlugin);
   await fastify.register(fastifyRateLimit, {
     global: true,
+    redis: fastify.redis,
     max: 100,
     timeWindow: '1 minute',
     errorResponseBuilder: () => ({
@@ -128,17 +131,17 @@ let fastify;
 
 // ─── OS signals ──────────────────────────────────────────────────────────────
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT', fastify.server));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM', fastify.server));
+process.on('SIGINT', () => gracefulShutdown('SIGINT', fastify));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM', fastify));
 
 // ─── Global error handlers ───────────────────────────────────────────────────
 
 process.on('uncaughtException', (err) => {
   process.stderr.write(`[UNCAUGHT EXCEPTION] ${err.message}\n${err.stack}\n`);
-  gracefulShutdown('uncaughtException', fastify.server);
+  gracefulShutdown('uncaughtException', fastify);
 });
 
 process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[UNHANDLED REJECTION] ${reason}\n`);
-  gracefulShutdown('unhandledRejection', fastify.server);
+  gracefulShutdown('unhandledRejection', fastify);
 });

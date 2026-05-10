@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "c92a4932-433a-4cc1-a7a5-61bd43d1f6b5",
-  "prevId": "f69d9747-b91a-4844-9caa-2ec1312cc8ac",
+  "id": "c567acbd-a397-4344-8159-61e78f9ebff9",
+  "prevId": "966b5d5d-2fee-48c0-99c2-b756dc462867",
   "tables": {
     "students": {
       "name": "students",
@@ -85,8 +85,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "tests": {
-      "name": "tests",
+    "users": {
+      "name": "users",
       "columns": {
         "id": {
           "name": "id",
@@ -95,75 +95,39 @@
           "notNull": true,
           "autoincrement": true
         },
-        "name": {
-          "name": "name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "age": {
-          "name": "age",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "group": {
-          "name": "group",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "email": {
           "name": "email",
           "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "grades": {
-          "name": "grades",
-          "type": "json",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "course": {
-          "name": "course",
-          "type": "int",
+        "password": {
+          "name": "password",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "image": {
-          "name": "image",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "test": {
-          "name": "test",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "''"
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tests_id": {
-          "name": "tests_id",
+        "users_id": {
+          "name": "users_id",
           "columns": [
             "id"
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            "email"
+          ]
+        }
+      },
       "checkConstraint": {}
     }
   },

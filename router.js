@@ -1,4 +1,7 @@
-import { studentRoutes, studentRoutesV2 } from '#controllers/students.controller';
+import {
+  buildStudentRoutes,
+  buildStudentRoutesV2,
+} from '#controllers/students.controller';
 import { githubRoutesV1, githubRoutesV2 } from '#controllers/github.controller';
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
@@ -53,6 +56,7 @@ export default async function router(fastify) {
   };
 
   const v1Routes = async (instance) => {
+    const studentRoutes = buildStudentRoutes({ redis: fastify.redis });
     const requireAdminApiKey = (request, reply, done) => {
       const apiKey = request.headers['x-api-key'];
       if (!apiKey || apiKey !== instance.config.ADMIN_API_KEY) {
@@ -233,6 +237,8 @@ export default async function router(fastify) {
   };
 
   const v2Routes = async (instance) => {
+    const studentRoutes = buildStudentRoutes({ redis: fastify.redis });
+    const studentRoutesV2 = buildStudentRoutesV2({ redis: fastify.redis });
     const v2BaseRoutes = studentRoutes.filter(
       (route) => !(route.method === 'GET' && route.url === '/students')
     );
