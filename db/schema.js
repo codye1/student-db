@@ -11,3 +11,9 @@ export const students = mysqlTable('students', {
   image: varchar('image', { length: 255 }),
   test: varchar('test', { length: 255 }).default('')
 });
+
+export const users = mysqlTable('users', {
+  id: serial('id').primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  password: varchar('password', { length: 255 }).notNull(),
+});

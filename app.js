@@ -16,8 +16,12 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyWebsocket from '@fastify/websocket';
+import fastifyJwt from '@fastify/jwt';
+import fastifyCookie from '@fastify/cookie';
 import mysqlPlugin from './db/mysql.js';
 import { initItemsRepository } from './src/repositories/items.repository.js';
+import redisPlugin from './src/plugins/redis.js';
+import { redisKeys } from './constants/redisKeys.js';
 
 // ─── Fastify server ──────────────────────────────────────────────────────────
 
@@ -60,8 +64,26 @@ let fastify;
   await checkMigration(fastify);
   await backupData();
   await fastify.register(fastifySensible);
+  await fastify.register(redisPlugin);
+  await fastify.register(fastifyCookie);
+  await fastify.register(fastifyJwt, {
+    secret: fastify.config.JWT_SECRET,
+    trusted: async (request, decodedToken) => {
+      const jti = decodedToken?.jti;
+      if (!jti) return false;
+      try {
+        const key = redisKeys.authAccessBlacklist(jti);
+        const blacklisted = await fastify.redis.get(key);
+        return !blacklisted;
+      } catch (error) {
+        request.log.error(error, 'JWT blacklist check failed');
+        return false;
+      }
+    },
+  });
   await fastify.register(fastifyRateLimit, {
     global: true,
+    redis: fastify.redis,
     max: 100,
     timeWindow: '1 minute',
     errorResponseBuilder: () => ({
@@ -76,6 +98,16 @@ let fastify;
         title: 'Student Database API',
         description: 'REST API for students service',
         version: '1.0.0',
+      },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+            description: 'Authorization: Bearer <token>',
+          },
+        },
       },
     },
   });
@@ -128,17 +160,17 @@ let fastify;
 
 // ─── OS signals ──────────────────────────────────────────────────────────────
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT', fastify.server));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM', fastify.server));
+process.on('SIGINT', () => gracefulShutdown('SIGINT', fastify));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM', fastify));
 
 // ─── Global error handlers ───────────────────────────────────────────────────
 
 process.on('uncaughtException', (err) => {
   process.stderr.write(`[UNCAUGHT EXCEPTION] ${err.message}\n${err.stack}\n`);
-  gracefulShutdown('uncaughtException', fastify.server);
+  gracefulShutdown('uncaughtException', fastify);
 });
 
 process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[UNHANDLED REJECTION] ${reason}\n`);
-  gracefulShutdown('unhandledRejection', fastify.server);
+  gracefulShutdown('unhandledRejection', fastify);
 });

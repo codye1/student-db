@@ -1,5 +1,9 @@
-import { studentRoutes, studentRoutesV2 } from '#controllers/students.controller';
+import {
+  buildStudentRoutes,
+  buildStudentRoutesV2,
+} from '#controllers/students.controller';
 import { githubRoutesV1, githubRoutesV2 } from '#controllers/github.controller';
+import { buildAuthRoutes } from '#controllers/auth.controller';
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
@@ -48,11 +52,48 @@ export default async function router(fastify) {
 
   const registerRoutes = (instance, routes) => {
     for (const route of routes) {
-      instance.route(route);
+      const methods = Array.isArray(route.method) ? route.method : [route.method];
+      const requiresAuth =
+        route.url.startsWith('/students') &&
+        methods.some((method) => ['POST', 'PATCH', 'DELETE'].includes(method));
+
+      if (!requiresAuth) {
+        instance.route(route);
+        continue;
+      }
+
+      const onRequestHook = async (request, reply) => {
+        try {
+          await request.jwtVerify();
+        } catch {
+          return reply.code(401).send({
+            statusCode: 401,
+            error: 'Unauthorized',
+            message: 'Invalid or missing token',
+          });
+        }
+      };
+
+      const existingHook = route.onRequest
+        ? Array.isArray(route.onRequest)
+          ? route.onRequest
+          : [route.onRequest]
+        : [];
+
+      instance.route({
+        ...route,
+        onRequest: [...existingHook, onRequestHook],
+        schema: {
+          ...(route.schema || {}),
+          security: [{ bearerAuth: [] }],
+        },
+      });
     }
   };
 
   const v1Routes = async (instance) => {
+    const studentRoutes = buildStudentRoutes({ redis: fastify.redis });
+    const authRoutes = buildAuthRoutes({ fastify });
     const requireAdminApiKey = (request, reply, done) => {
       const apiKey = request.headers['x-api-key'];
       if (!apiKey || apiKey !== instance.config.ADMIN_API_KEY) {
@@ -229,10 +270,13 @@ export default async function router(fastify) {
 
     // Students routes
     registerRoutes(instance, studentRoutes);
+    registerRoutes(instance, authRoutes);
     registerRoutes(instance, githubRoutesV1);
   };
 
   const v2Routes = async (instance) => {
+    const studentRoutes = buildStudentRoutes({ redis: fastify.redis });
+    const studentRoutesV2 = buildStudentRoutesV2({ redis: fastify.redis });
     const v2BaseRoutes = studentRoutes.filter(
       (route) => !(route.method === 'GET' && route.url === '/students')
     );

@@ -4,8 +4,16 @@ export default {
   additionalProperties: false,
   properties: {
     id: {
-      type: 'integer',
-      minimum: 1,
+      anyOf: [
+        {
+          type: 'integer',
+          minimum: 1,
+        },
+        {
+          type: 'string',
+          minLength: 1,
+        },
+      ],
     },
   },
 };
