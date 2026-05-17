@@ -45,7 +45,11 @@ export default async function router(fastify) {
     eventsBus.off('students:updated', onStudentUpdated);
     eventsBus.off('students:deleted', onStudentDeleted);
     for (const socket of sockets) {
-      socket.close();
+      try {
+        socket.close();
+      } catch (err) {
+        fastify.log.warn(err, 'Error while closing websocket');
+      }
     }
     sockets.clear();
   });

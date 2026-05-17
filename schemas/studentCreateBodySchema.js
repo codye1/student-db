@@ -1,6 +1,6 @@
 export default {
   type: 'object',
-  required: ['name', 'course', 'grades'],
+  required: ['name', 'age', 'group', 'course', 'grades'],
   additionalProperties: false,
   properties: {
     name: {

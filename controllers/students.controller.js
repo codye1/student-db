@@ -149,7 +149,7 @@ const exportStudentsCsvHandler = async (request, reply) => {
     streams.push(new StudentAvgGradeTransform());
   }
 
-  reply.header('Content-Type', 'text/csv');
+  reply.type('text/csv; charset=utf-8');
   reply.header('Content-Disposition', 'attachment; filename="students.csv"');
 
   try {
@@ -193,34 +193,62 @@ export const buildStudentRoutes = ({ redis }) => {
         404: errorResponseSchema,
       },
     },
-    handler: async (request, reply) => {
+      handler: async (request, reply) => {
       const { id } = request.params;
       const student = await findById(id);
       if (!student) {
         return reply.code(404).send({ error: STUDENT_NOT_FOUND(id) });
       }
 
-      const data = await request.file();
+      let data;
+      try {
+        data = await request.file();
+      } catch (err) {
+        request.log.warn(err, 'Multipart parsing failed');
+        return reply.badRequest('Invalid file upload');
+      }
+
       if (!data) return reply.badRequest('No file uploaded');
-      if (!['image/jpeg', 'image/png'].includes(data.mimetype)) {
+      const mimetype = data.mimetype || (data.type ?? null);
+      if (!['image/jpeg', 'image/png'].includes(mimetype)) {
         return reply.badRequest('Only images allowed');
       }
-      if (data.file.truncated) {
+
+      // handle truncated or buffer-based uploads
+      if (data.file && data.file.truncated) {
         return reply.badRequest('File too large');
       }
-      const ext = data.mimetype === 'image/png' ? '.png' : '.jpg';
+
+      const ext = mimetype === 'image/png' ? '.png' : '.jpg';
       const uploadDir = path.join(process.cwd(), 'uploads', id);
       await fs.mkdir(uploadDir, { recursive: true });
       const filePath = path.join(uploadDir, `image${ext}`);
       const relPath = `/${id}/image${ext}`;
-      const stream = data.file;
-      const { createWriteStream } = await import('fs');
-      await new Promise((resolve, reject) => {
-        const writeStream = createWriteStream(filePath);
-        stream.pipe(writeStream);
-        writeStream.on('finish', resolve);
-        writeStream.on('error', reject);
-      });
+
+      try {
+        const { createWriteStream } = await import('fs');
+        const stream = data.file;
+        await new Promise((resolve, reject) => {
+          const writeStream = createWriteStream(filePath);
+          if (stream && typeof stream.pipe === 'function') {
+            stream.pipe(writeStream);
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+          } else if (typeof data.toBuffer === 'function') {
+            data.toBuffer().then((buf) => writeStream.end(buf)).then(resolve).catch(reject);
+          } else if (Buffer.isBuffer(data)) {
+            writeStream.end(data);
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+          } else {
+            reject(new Error('Unsupported file stream'));
+          }
+        });
+      } catch (err) {
+        request.log.error(err, 'Failed to write uploaded file');
+        return reply.code(500).send({ error: 'Failed to save file' });
+      }
+
       const updatedStudent = await update(id, { image: relPath });
       eventsBus.emit('students:updated', updatedStudent);
       await studentsCacheService.invalidateStudentsCache();
@@ -414,12 +442,14 @@ export const buildStudentRoutes = ({ redis }) => {
       },
     },
     handler: async (request, reply) => {
-      const { name, grades, course, email } = request.body;
+      const { name, grades, course, email, age, group } = request.body;
       const student = await create({
         name: name.trim(),
         grades,
         course,
         email,
+        age,
+        group,
       });
       eventsBus.emit('students:created', student);
       await studentsCacheService.invalidateStudentsCache();
@@ -444,6 +474,8 @@ export const buildStudentRoutes = ({ redis }) => {
       const patch = {};
       if (request.body.name !== undefined)
         patch.name = request.body.name.trim();
+      if (request.body.age !== undefined) patch.age = request.body.age;
+      if (request.body.group !== undefined) patch.group = request.body.group;
       if (request.body.grades !== undefined) patch.grades = request.body.grades;
       if (request.body.course !== undefined) patch.course = request.body.course;
       if (request.body.email !== undefined) patch.email = request.body.email;

@@ -33,7 +33,11 @@ async function mysqlPlugin(fastify) {
   fastify.decorate('db', pool);
 
   fastify.addHook('onClose', async () => {
-    await pool.end();
+    try {
+      await pool.end();
+    } catch (err) {
+      fastify.log.error(err, 'Error while closing MySQL pool');
+    }
   });
 }
 

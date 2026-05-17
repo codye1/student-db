@@ -23,6 +23,7 @@ const envSchema = {
     GITHUB_TOKEN: { type: 'string', default: '' },
     REDIS_HOST: { type: 'string', default: '127.0.0.1' },
     REDIS_PORT: { type: 'string', default: '6379' },
+    REDIS_DB: { type: 'string', default: '0' },
     MYSQL_HOST: { type: 'string', default: '127.0.0.1' },
     MYSQL_PORT: { type: 'string', default: '3306' },
     MYSQL_USER: { type: 'string', default: 'root' },

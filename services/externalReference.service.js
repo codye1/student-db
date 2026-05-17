@@ -44,11 +44,15 @@ const fetchWithRetry = async (url) => {
 export const createExternalReferenceService = ({ redis, redisKeys }) => {
   const getCoursesFromCache = async () => {
     if (!redis) return null;
-    const raw = await redis.get(redisKeys.externalCourses());
-    if (!raw) return null;
     try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : null;
+      const raw = await redis.get(redisKeys.externalCourses());
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
     } catch {
       return null;
     }
@@ -56,12 +60,16 @@ export const createExternalReferenceService = ({ redis, redisKeys }) => {
 
   const cacheCourses = async (courses) => {
     if (!redis) return;
-    await redis.set(
-      redisKeys.externalCourses(),
-      JSON.stringify(courses),
-      'EX',
-      CACHE_TTL_SEC
-    );
+    try {
+      await redis.set(
+        redisKeys.externalCourses(),
+        JSON.stringify(courses),
+        'EX',
+        CACHE_TTL_SEC
+      );
+    } catch {
+      return;
+    }
   };
 
   const getExternalCourseDetails = async (courseId) => {
