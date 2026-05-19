@@ -23,16 +23,18 @@ function loadDotEnvSync() {
 }
 
 const env = loadDotEnvSync();
+const runtimeEnv = globalThis.process?.env ?? {};
+const mergedEnv = { ...env, ...runtimeEnv };
 
 export default {
   dialect: 'mysql',
   schema: './db/schema.js',
   out: './db/migrations',
   dbCredentials: {
-    host: env.MYSQL_HOST ?? '127.0.0.1',
-    port: Number(env.MYSQL_PORT ?? 3306),
-    user: env.MYSQL_USER ?? 'root',
-    password: env.MYSQL_PASSWORD ?? '',
-    database: env.MYSQL_DB ?? 'student_db',
+    host: mergedEnv.MYSQL_HOST ?? '127.0.0.1',
+    port: Number(mergedEnv.MYSQL_PORT ?? 3306),
+    user: mergedEnv.MYSQL_USER ?? 'root',
+    password: mergedEnv.MYSQL_PASSWORD ?? '',
+    database: mergedEnv.MYSQL_DB ?? 'student_db',
   },
 };

@@ -160,7 +160,14 @@ export const buildAuthRoutes = ({ fastify }) => {
         },
       },
       handler: async (request, reply) => {
-        const refreshToken = request.cookies?.[REFRESH_COOKIE_NAME];
+        let refreshToken = request.cookies?.[REFRESH_COOKIE_NAME];
+        // Fallback: parse raw cookie header if fastify-cookie didn't populate
+        if (!refreshToken && request.headers && request.headers.cookie) {
+          const raw = String(request.headers.cookie || '');
+          const match = raw.split(';').map((s) => s.trim()).find((p) => p.startsWith(`${REFRESH_COOKIE_NAME}=`));
+          if (match) refreshToken = match.split('=')[1];
+        }
+
         if (!refreshToken) {
           return reply.code(401).send({
             statusCode: 401,
@@ -168,9 +175,17 @@ export const buildAuthRoutes = ({ fastify }) => {
             message: 'Refresh token is missing',
           });
         }
-        const userId = await fastify.redis.get(
-          redisKeys.authRefreshToken(refreshToken)
-        );
+
+        let userId;
+        try {
+          userId = await fastify.redis.get(
+            redisKeys.authRefreshToken(refreshToken)
+          );
+        } catch (err) {
+          request.log.warn(err, 'Redis get failed during refresh');
+          userId = null;
+        }
+
         if (!userId) {
           return reply.code(401).send({
             statusCode: 401,
